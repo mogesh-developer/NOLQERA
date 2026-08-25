@@ -1,16 +1,24 @@
+from .features import (
+    BagOfWords,
+    FrequencyAnalyzer,
+    TextStatistics,
+    TfidfVectorizer,
+    Vocabulary,
+    generate_ngrams,
+    generate_ngrams_from_text,
+)
 from .preprocessing import preprocess
 from .tokenization import Tokenizer
-from .features import (
-    generate_ngrams,
-    BagOfWords,
-    TfidfVectorizer,
-)
 
 
 __all__ = [
-    "preprocess",
-    "Tokenizer",
-    "generate_ngrams",
     "BagOfWords",
+    "FrequencyAnalyzer",
+    "TextStatistics",
     "TfidfVectorizer",
+    "Tokenizer",
+    "Vocabulary",
+    "generate_ngrams",
+    "generate_ngrams_from_text",
+    "preprocess",
 ]
