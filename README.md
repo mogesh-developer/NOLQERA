@@ -4,7 +4,7 @@
 
 NOLQERA is an experimental NLP toolkit built from the ground up with a strong focus on **understanding how NLP algorithms work internally** rather than simply wrapping existing libraries.
 
-The project starts with classical NLP fundamentals and gradually evolves toward modern NLP systems such as embeddings, transformers, retrieval, and RAG.
+The project starts with classical NLP fundamentals and gradually evolves toward modern NLP systems such as embeddings, transformers, retrieval, document intelligence, and RAG.
 
 ---
 
@@ -16,63 +16,60 @@ NOLQERA aims to become a modular NLP engine where each major NLP concept can be 
 Text
  │
  ▼
-Preprocessing
+Preprocessing & Tokenization
  │
  ▼
-Tokenization
+Feature Engineering & Vocabulary
  │
  ▼
-Feature Engineering
+Classical & Machine Learning NLP (Naive Bayes, Logistic Regression)
  │
  ▼
-Classical NLP
+NOLQERA Intelligence Engines
+ ├── Relevance Engine
+ ├── Importance Engine
+ ├── Keyphrase Engine
+ ├── Entity Engine
+ ├── Intent Engine
+ └── Semantic Similarity Engine
  │
  ▼
-Machine Learning NLP
+Embeddings & Transformers (TF-IDF & Transformer Adapters)
  │
  ▼
-Embeddings
- │
- ▼
-Transformers
- │
- ▼
-Retrieval / RAG
- │
- ▼
-Modern NLP Engine
+Retrieval / RAG / Document Intelligence
 ```
 
 ---
 
 ## Current Status
 
-### v0.1.0 — Classical NLP Foundation
+### Version Overview
 
-| Module                | Status      |
-| --------------------- | ----------- |
-| Text Cleaning         | Done        |
-| Text Normalization    | Done        |
-| Stopword Removal      | Done        |
-| Stemming              | Done        |
-| Lemmatization         | Done        |
-| Sentence Tokenization | Done        |
-| Word Tokenization     | Done        |
-| N-Grams               | Done        |
-| Bag of Words          | Done        |
-| TF-IDF                | Done        |
-| Validation            | Done        |
-| Test Suite            | In Progress |
+| Module                        | Status | Features / Components |
+| ----------------------------- | ------ | --------------------- |
+| **Text Preprocessing**        | Done   | Cleaning (HTML/URL), Normalization, Stopwords, Rule-based Stemmer, Dictionary Lemmatizer, Pipeline |
+| **Tokenization**              | Done   | Sentence Tokenizer, Word Tokenizer (Contractions, Hyphens, Tanglish, Unicode, Emoji) |
+| **Document Representation**   | Done   | `Sentence`, `Document` abstractions |
+| **Vocabulary & Text Stats**   | Done   | Vocabulary Manager (Frequency Filtering, `UNK`), Text Statistics (TTR, Readability, Frequencies) |
+| **Feature Extraction**        | Done   | N-Grams, Bag of Words (BoW), Mathematical TF-IDF Vectorizer |
+| **Machine Learning NLP**      | Done   | Multinomial Naive Bayes, Logistic Regression (Gradient Descent, Cross-Entropy Loss), Metrics, Report |
+| **Relevance Engine**          | Done   | Sentence relevance scoring & ranking using TF-IDF and Cosine Similarity |
+| **Importance Engine**         | Done   | Sentence centrality ranking with position bias and length normalization |
+| **Keyphrase Engine**          | Done   | N-gram candidate extraction, TF-IDF + Position scoring, Overlap deduplication |
+| **Entity Engine**             | Done   | Candidate extraction, Contextual detection (PERSON, LOCATION, ORGANIZATION), Span cleanup |
+| **Intent Engine**             | Done   | Interrogative & structural signal extraction, Evidence-based confidence scoring, Intent ranking |
+| **Semantic Similarity**       | Done   | Cosine similarity, Qualitative scoring, TF-IDF & Transformer embedding providers |
+| **Test Suite**                | Done   | 320+ unit and integration tests passing cleanly |
 
 ---
 
-## Architecture
+## Project Architecture
 
 ```text
 nolqera/
 │
 ├── nolqera/
-│   │
 │   ├── preprocessing/
 │   │   ├── cleaner.py
 │   │   ├── normalizer.py
@@ -86,426 +83,314 @@ nolqera/
 │   │   ├── word_tokenizer.py
 │   │   └── tokenizer.py
 │   │
+│   ├── document/
+│   │   ├── sentence.py
+│   │   └── document.py
+│   │
 │   ├── features/
+│   │   ├── vocabulary.py
+│   │   ├── frequency.py
+│   │   ├── text_statistics.py
 │   │   ├── ngrams.py
 │   │   ├── bow.py
 │   │   └── tfidf.py
 │   │
-│   └── utils/
-│       └── text_utils.py
+│   ├── classification/
+│   │   ├── naive_bayes.py
+│   │   ├── logistic_regression.py
+│   │   ├── text_classifier.py
+│   │   ├── metrics.py
+│   │   └── report.py
+│   │
+│   └── intelligence/
+│       ├── relevance/
+│       │   ├── similarity.py
+│       │   ├── scorer.py
+│       │   ├── ranking.py
+│       │   ├── models.py
+│       │   └── engine.py
+│       │
+│       ├── importance/
+│       │   ├── scorer.py
+│       │   ├── ranking.py
+│       │   ├── models.py
+│       │   └── engine.py
+│       │
+│       ├── keyphrase/
+│       │   ├── candidates.py
+│       │   ├── scorer.py
+│       │   ├── ranking.py
+│       │   ├── models.py
+│       │   └── engine.py
+│       │
+│       ├── entities/
+│       │   ├── candidates.py
+│       │   ├── detector.py
+│       │   ├── cleanup.py
+│       │   ├── ranking.py
+│       │   ├── models.py
+│       │   └── engine.py
+│       │
+│       ├── intent/
+│       │   ├── candidates.py
+│       │   ├── classifier.py
+│       │   ├── scorer.py
+│       │   ├── ranking.py
+│       │   ├── models.py
+│       │   └── engine.py
+│       │
+│       └── semantic_similarity/
+│           ├── similarity.py
+│           ├── scorer.py
+│           ├── ranking.py
+│           ├── models.py
+│           ├── engine.py
+│           └── embeddings/
+│               ├── base.py
+│               ├── tfidf.py
+│               └── transformer.py
 │
 ├── tests/
-├── examples/
-├── docs/
-├── README.md
 ├── pyproject.toml
+├── README.md
 └── LICENSE
 ```
 
 ---
 
-# Installation
+## Installation
 
-NOLQERA currently requires Python 3.11 or newer.
-
-### Clone
+NOLQERA requires **Python 3.11** or newer.
 
 ```bash
-git clone https://github.com/mogesh-developer/nolqera.git
-cd nolqera
-```
+# Clone repository
+git clone https://github.com/mogesh-developer/NOLQERA.git
+cd NOLQERA
 
-### Create virtual environment
-
-```bash
+# Create & activate virtual environment
 python -m venv venv
-```
-
-### Activate on Windows
-
-```powershell
+# On Windows PowerShell:
 venv\Scripts\activate
-```
+# On Linux/macOS:
+source venv/bin/activate
 
-### Install
-
-```bash
+# Install package with development dependencies
 pip install -e ".[dev]"
 ```
 
 ---
 
-# Quick Start
+## Quick Start & Core Usage
 
-## Preprocessing
-
-```python
-from nolqera import preprocess
-
-text = "  Hello NOLQERA! Visit https://example.com  "
-
-result = preprocess(text)
-
-print(result)
-```
-
-Output:
-
-```text
-hello nolqera!
-```
-
----
-
-## Configurable Preprocessing
+### 1. Preprocessing & Tokenization
 
 ```python
+from nolqera import preprocess, Tokenizer
 from nolqera.preprocessing import PreprocessingPipeline
 
+# Unified convenience function
+clean_text = preprocess("Visit https://example.com! We're building NOLQERA.")
+print(clean_text)
+
+# Tokenizer
+tokenizer = Tokenizer()
+sentences = tokenizer.sentences("FastAPI is fast. MongoDB stores data.")
+words = tokenizer.words("Hello world! How are you?")
+print("Sentences:", sentences)
+print("Words:", words)
+
+# Configurable Preprocessing Pipeline
 pipeline = PreprocessingPipeline(
     remove_stopwords=True,
     stemming=True,
 )
-
-result = pipeline.process(
-    "I am playing with cars."
-)
-
-print(result)
+processed_tokens = pipeline.process("FastAPI provides REST API endpoints.")
+print("Processed:", processed_tokens)
 ```
 
 ---
 
-# Tokenization
+### 2. Feature Engineering & Vectorization
 
 ```python
-from nolqera import Tokenizer
-
-tokenizer = Tokenizer()
-
-text = "Hello, NOLQERA! How are you?"
-
-print(tokenizer.sentences(text))
-print(tokenizer.words(text))
-```
-
-Example:
-
-```text
-Sentences:
-[
-    "Hello, NOLQERA!",
-    "How are you?"
-]
-
-Words:
-[
-    "Hello",
-    ",",
-    "NOLQERA",
-    "!",
-    "How",
-    "are",
-    "you",
-    "?"
-]
-```
-
----
-
-# N-Grams
-
-```python
-from nolqera import generate_ngrams
-
-tokens = [
-    "I",
-    "love",
-    "NOLQERA",
-]
-
-bigrams = generate_ngrams(tokens, 2)
-
-print(bigrams)
-```
-
-Output:
-
-```text
-[
-    ("I", "love"),
-    ("love", "NOLQERA")
-]
-```
-
----
-
-# Bag of Words
-
-```python
-from nolqera import BagOfWords
+from nolqera import TfidfVectorizer, BagOfWords
 
 documents = [
-    ["i", "love", "nlp"],
-    ["i", "love", "python"],
+    ["fastapi", "web", "framework"],
+    ["mongodb", "nosql", "database"],
+    ["fastapi", "mongodb", "backend"],
 ]
 
-bow = BagOfWords()
+# TF-IDF Vectorizer
+tfidf = TfidfVectorizer()
+tfidf_vectors = tfidf.fit_transform(documents)
 
-vectors = bow.fit_transform(documents)
-
-print(bow.vocabulary)
-print(vectors)
-```
-
-Output:
-
-```text
-Vocabulary:
-[
-    "i",
-    "love",
-    "nlp",
-    "python"
-]
-
-Vectors:
-[
-    [1, 1, 1, 0],
-    [1, 1, 0, 1]
-]
+print("Vocabulary:", tfidf.vocabulary_list)
+print("TF-IDF Matrix:", tfidf_vectors)
 ```
 
 ---
 
-# TF-IDF
-
-NOLQERA implements TF-IDF from its underlying mathematical formulation.
+### 3. Classification & Evaluation
 
 ```python
-from nolqera import TfidfVectorizer
+from nolqera.classification import NaiveBayesClassifier, LogisticRegressionClassifier, classification_report
 
-documents = [
-    ["i", "love", "nlp"],
-    ["i", "love", "python"],
+# Train Naive Bayes text classifier
+classifier = NaiveBayesClassifier()
+X_train = [["fastapi", "api"], ["mongodb", "database"], ["python", "api"]]
+y_train = ["tech", "database", "tech"]
+
+classifier.fit(X_train, y_train)
+predictions = classifier.predict([["fastapi", "framework"]])
+print("Prediction:", predictions)
+```
+
+---
+
+### 4. NOLQERA Intelligence Engines
+
+NOLQERA comes equipped with standalone intelligence engines:
+
+#### Relevance Engine
+Calculates text-query relevance using TF-IDF and Cosine Similarity:
+```python
+from nolqera.intelligence.relevance import RelevanceEngine
+
+engine = RelevanceEngine()
+query = "What database does the application use?"
+sentences = [
+    "The application is built using FastAPI.",
+    "The application uses MongoDB for data storage.",
 ]
 
-vectorizer = TfidfVectorizer()
-
-vectors = vectorizer.fit_transform(documents)
-
-print(vectorizer.vocabulary)
-print(vectors)
+results = engine.analyze(query, sentences)
+print("Most Relevant:", results[0].sentence, "| Score:", results[0].score)
 ```
 
-### Mathematical foundation
+#### Importance Engine
+Ranks key sentences within a document based on informative TF-IDF density and positional weighting:
+```python
+from nolqera.intelligence.importance import ImportanceEngine
 
-```text
-TF = term frequency
+engine = ImportanceEngine()
+document = [
+    "FastAPI provides REST API endpoints.",
+    "The application uses MongoDB for data storage.",
+]
 
-IDF = log(
-    total documents /
-    document frequency
-)
-
-TF-IDF = TF × IDF
+ranked = engine.analyze(document)
+print("Top Sentence:", ranked[0].sentence, "| Importance:", ranked[0].score)
 ```
 
-The goal is not only to provide the feature, but also to make its internal mechanics understandable.
+#### Keyphrase Engine
+Extracts informative n-gram keyphrases and eliminates overlapping terms:
+```python
+from nolqera.intelligence.keyphrase import KeyphraseEngine
 
----
+engine = KeyphraseEngine()
+text = "The application uses FastAPI for REST APIs. MongoDB is used for persistent data storage."
 
-# Design Philosophy
-
-NOLQERA follows a few core principles.
-
-### 1. Understand before abstracting
-
-Every major NLP concept should first be understood at the algorithmic level.
-
-### 2. Minimal dependencies
-
-The foundation should rely primarily on Python's standard library whenever practical.
-
-### 3. Modular architecture
-
-Each NLP capability should have a clear responsibility.
-
-```text
-Cleaner
-Normalizer
-Tokenizer
-Feature Extractor
-Vectorizer
+keyphrases = engine.extract(text, top_k=3)
+for kp in keyphrases:
+    print(f"{kp.rank}. {kp.phrase} (score: {kp.score:.4f})")
 ```
 
-should remain independently testable.
+#### Entity Engine
+Extracts candidate entity spans, infers types (`PERSON`, `LOCATION`, `ORGANIZATION`), and resolves overlapping boundaries:
+```python
+from nolqera.intelligence.entities import EntityEngine
 
-### 4. Test-driven development
+engine = EntityEngine()
+text = "Dr John travelled to Chennai and studied at American College."
 
-Every major feature should have tests covering:
-
-* normal inputs
-* empty inputs
-* invalid inputs
-* edge cases
-* expected mathematical behavior
-
-### 5. Learn from implementation
-
-NOLQERA is not intended to be just another wrapper around:
-
-* NLTK
-* spaCy
-* scikit-learn
-* Hugging Face
-
-Those libraries can later be used for comparison and validation.
-
----
-
-# Roadmap
-
-## Phase 1 — Classical NLP
-
-* [x] Text cleaning
-* [x] Normalization
-* [x] Stopwords
-* [x] Stemming
-* [x] Lemmatization
-* [x] Sentence tokenization
-* [x] Word tokenization
-* [x] N-Grams
-* [x] Bag of Words
-* [x] TF-IDF
-
-## Phase 2 — NLP Foundations
-
-* [ ] Vocabulary management
-* [ ] Frequency analysis
-* [ ] Text statistics
-* [ ] Language detection
-* [ ] Advanced tokenization
-* [ ] Morphological analysis
-* [ ] POS tagging fundamentals
-
-## Phase 3 — Classical Machine Learning
-
-* [ ] Naive Bayes
-* [ ] Logistic Regression
-* [ ] Text classification
-* [ ] Feature selection
-* [ ] Evaluation metrics
-
-## Phase 4 — Neural NLP
-
-* [ ] Word embeddings
-* [ ] Word2Vec concepts
-* [ ] CBOW
-* [ ] Skip-gram
-* [ ] Embedding similarity
-* [ ] Neural text classification
-
-## Phase 5 — Transformers
-
-* [ ] Attention
-* [ ] Self-attention
-* [ ] Positional encoding
-* [ ] Transformer architecture
-* [ ] BERT fundamentals
-* [ ] Encoder / decoder concepts
-
-## Phase 6 — Modern NLP
-
-* [ ] Sentence embeddings
-* [ ] Semantic similarity
-* [ ] Vector search
-* [ ] Retrieval
-* [ ] RAG
-* [ ] Document intelligence
-
-## Phase 7 — NOLQERA Platform
-
-Eventually NOLQERA can evolve into a larger ecosystem:
-
-```text
-                    NOLQERA
-                       │
-          ┌────────────┼────────────┐
-          │            │            │
-          ▼            ▼            ▼
-      NLP Core     NOLQERA CLI   NOLQERA Studio
-          │                         │
-          │                         ▼
-          │                    Visual NLP
-          │                    Experiments
-          │                    Pipelines
-          │                    Evaluation
-          │
-          ▼
-    NLP Applications
+entities = engine.analyze(text)
+for entity in entities:
+    print(f"{entity.text:<20} {entity.entity_type:<15} score: {entity.score:.4f}")
 ```
 
-The GUI/visual layer will remain separate from the core engine so that NOLQERA can be used both as a Python library and as a developer-facing NLP platform.
+#### Intent Engine
+Extracts intent signals (interrogatives, structure, keywords) and produces confidence-weighted intent classifications:
+```python
+from nolqera.intelligence.intent import IntentEngine
 
----
-
-# Development
-
-Run the complete test suite:
-
-```bash
-pytest
+engine = IntentEngine()
+intents = engine.analyze("How does FastAPI work?")
+print("Detected Intent:", intents[0].intent, "| Score:", intents[0].score)
 ```
 
-Run a specific test module:
+#### Semantic Similarity Engine
+Computes semantic similarity between text spans using TF-IDF or Transformer embedding providers:
+```python
+from nolqera.intelligence.semantic_similarity import SemanticSimilarityEngine
+from nolqera.intelligence.semantic_similarity.embeddings.tfidf import TFIDFEmbeddingProvider
 
-```bash
-pytest tests/test_preprocessing.py
-```
+# Initialize provider and fit on corpus
+provider = TFIDFEmbeddingProvider()
+provider.fit([
+    ["fastapi", "backend", "api"],
+    ["mongodb", "database", "storage"]
+])
 
-Run the example:
-
-```bash
-python examples/basic_usage.py
+engine = SemanticSimilarityEngine(provider)
+result = engine.compare(["fastapi", "backend"], ["fastapi", "api"])
+print(f"Similarity: {result.score:.4f} | {result.text_a} <-> {result.text_b}")
 ```
 
 ---
 
-# Project Principles
+## Design Philosophy
 
-NOLQERA is being developed incrementally.
+NOLQERA follows core engineering principles:
 
-Instead of immediately building a huge NLP framework, the project grows through small, understandable components:
+1. **Understand Before Abstracting**: Every algorithm (TF-IDF, Naive Bayes, Logistic Regression, Cosine Similarity, Keyphrase Scorer) is built from mathematical fundamentals.
+2. **Zero Bloat / Minimal Dependencies**: Core NLP & intelligence modules run with standard Python libraries.
+3. **Modular Component Architecture**: Every component is decoupled and independently testable.
+4. **Comprehensive Test Coverage**: Strict unit and integration tests covering happy paths, edge cases, type errors, and boundary validations.
 
-```text
-Concept
-   ↓
-Mathematics / Algorithm
-   ↓
-Implementation
-   ↓
-Tests
-   ↓
-Comparison
-   ↓
-Optimization
-   ↓
-Reusable Component
+---
+
+## Roadmap
+
+- [x] **Phase 1 — Classical NLP Foundation**: Cleaning, Normalization, Stopwords, Stemming, Lemmatization, Tokenization, BoW, TF-IDF.
+- [x] **Phase 2 — Vocabulary & Text Statistics**: Vocabulary Manager, UNK token handling, Readability scores, Lexical Diversity (TTR), Term Frequencies.
+- [x] **Phase 3 — Machine Learning NLP**: Naive Bayes, Logistic Regression (Gradient Descent, Cross-Entropy), Metrics & Reports.
+- [x] **Phase 4 — NOLQERA Intelligence Suite**:
+  - [x] Sentence Relevance Engine
+  - [x] Document Importance Engine
+  - [x] Keyphrase Extraction & Deduplication Engine
+  - [x] Entity Detection & Span Cleaner Engine
+  - [x] Intent Signal & Classification Engine
+  - [x] Semantic Similarity & Embedding Providers (TF-IDF & Transformer adapters)
+- [ ] **Phase 5 — Neural Embeddings & Transformers**: Custom Word2Vec (Skip-gram, CBOW), Dense Vector Store, Self-Attention & Transformer Blocks.
+- [ ] **Phase 6 — Retrieval & RAG**: Vector Indexing, Hybrid Search (Sparse + Dense), Document Intelligence Pipeline.
+
+---
+
+## Development & Testing
+
+Run the full pytest suite:
+
+```powershell
+pytest -v
 ```
 
-This approach makes the project useful both as a learning platform and as a foundation for future NLP applications.
+Run specific test modules:
+
+```powershell
+pytest tests/test_relevance_engine.py -v
+pytest tests/test_entity_engine.py -v
+pytest tests/test_intent_engine.py -v
+pytest tests/test_semantic_similarity_engine.py -v
+```
 
 ---
 
-# License
+## License
 
-This project is licensed under the MIT License.
-
-See [`LICENSE`](LICENSE) for details.
+This project is licensed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
 
 ---
 
-## NOLQERA
-
+### NOLQERA
 **Learn NLP. Build NLP. Understand NLP.**
