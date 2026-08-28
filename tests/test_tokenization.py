@@ -80,3 +80,13 @@ def test_unicode_word():
         "café",
         "résumé",
     ]
+
+
+def test_tokenizer_tokenize():
+    from nolqera.tokenization import Tokenizer
+
+    tokenizer = Tokenizer()
+    text = "Hello NOLQERA!"
+
+    assert tokenizer.tokenize(text) == ["hello", "nolqera", "!"]
+    assert tokenizer.tokenize(text, lowercase=False) == ["Hello", "NOLQERA", "!"]

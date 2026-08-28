@@ -7,8 +7,16 @@ from .features import (
     generate_ngrams,
     generate_ngrams_from_text,
 )
+from .classification import (
+    MultinomialNaiveBayes,
+    LogisticRegression,
+    classification_report,
+    TextClassifier,
+)
 from .preprocessing import preprocess
 from .tokenization import Tokenizer
+from .utils import train_test_split
+from .document import Document, Sentence
 
 
 __all__ = [
@@ -18,7 +26,14 @@ __all__ = [
     "TfidfVectorizer",
     "Tokenizer",
     "Vocabulary",
+    "classification_report",
+    "TextClassifier",
     "generate_ngrams",
     "generate_ngrams_from_text",
     "preprocess",
+    "MultinomialNaiveBayes",
+    "LogisticRegression",
+    "train_test_split",
+    "Document",
+    "Sentence",
 ]
