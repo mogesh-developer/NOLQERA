@@ -1,6 +1,6 @@
 from nolqera.features.tfidf import TfidfVectorizer
 from nolqera.preprocessing.pipeline import PreprocessingPipeline
-from nolqera.relevance.similarity import cosine_similarity
+from nolqera.intelligence.relevance.similarity import cosine_similarity
 
 
 def test_tfidf_cosine_similarity_finds_relevant_sentence():

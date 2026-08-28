@@ -1,6 +1,6 @@
 import pytest
 
-from nolqera.relevance.ranking import (
+from nolqera.intelligence.relevance.ranking import (
     RelevanceRanker,
 )
 

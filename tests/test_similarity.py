@@ -1,6 +1,6 @@
 import pytest
 
-from nolqera.relevance.similarity import cosine_similarity
+from nolqera.intelligence.relevance.similarity import cosine_similarity
 
 
 def test_identical_vectors_have_maximum_similarity():

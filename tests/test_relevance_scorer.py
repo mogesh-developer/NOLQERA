@@ -1,6 +1,6 @@
 import pytest
 
-from nolqera.relevance.scorer import (
+from nolqera.intelligence.relevance.scorer import (
     RelevanceScorer,
 )
 

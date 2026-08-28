@@ -1,8 +1,8 @@
 from nolqera.features.tfidf import TfidfVectorizer
 from nolqera.preprocessing.pipeline import PreprocessingPipeline
-from nolqera.relevance.ranking import RelevanceRanker
-from nolqera.relevance.scorer import RelevanceScorer
-from nolqera.relevance.similarity import cosine_similarity
+from nolqera.intelligence.relevance.ranking import RelevanceRanker
+from nolqera.intelligence.relevance.scorer import RelevanceScorer
+from nolqera.intelligence.relevance.similarity import cosine_similarity
 
 
 def test_relevance_pipeline_ranks_real_context():
