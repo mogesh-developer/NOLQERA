@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/mogesh-developer/NOLQERA"><img src="https://img.shields.io/badge/python-3.11+-3776AB.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge" alt="License MIT"></a>
-  <a href="https://github.com/mogesh-developer/NOLQERA"><img src="https://img.shields.io/badge/tests-320%2B%20passed-brightgreen.svg?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests"></a>
+  <a href="https://github.com/mogesh-developer/NOLQERA"><img src="https://img.shields.io/badge/tests-655%20passed-brightgreen.svg?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests"></a>
   <a href="https://github.com/mogesh-developer/NOLQERA"><img src="https://img.shields.io/badge/architecture-modular-orange.svg?style=for-the-badge" alt="Architecture"></a>
   <a href="https://github.com/mogesh-developer/NOLQERA"><img src="https://img.shields.io/badge/status-active--development-blueviolet.svg?style=for-the-badge" alt="Status"></a>
 </p>
@@ -26,13 +26,19 @@
 - [Installation](#-installation)
 - [Quickstart Guide](#-quickstart-guide)
 - [NOLQERA Intelligence Suite](#-nolqera-intelligence-suite)
-  - [Sentence Relevance Engine](#1-sentence-relevance-engine)
-  - [Document Importance Engine](#2-document-importance-engine)
-  - [Keyphrase Extraction Engine](#3-keyphrase-extraction-engine)
-  - [Named Entity Recognition Engine](#4-named-entity-recognition-engine)
-  - [Intent Classification Engine](#5-intent-classification-engine)
-  - [Semantic Similarity Engine](#6-semantic-similarity-engine)
-- [Development & Testing](#-development--testing)
+- [Retrieval Quality Pipeline](#-retrieval-quality-pipeline)
+  - [Query Preprocessing](#1-query-preprocessing)
+  - [Score Normalization](#2-score-normalization)
+  - [Candidate Retrieval](#3-candidate-retrieval)
+  - [Result Filtering](#4-result-filtering)
+  - [Deduplication \& Diversity](#5-deduplication--diversity)
+  - [Reranking \& Evaluation](#6-reranking--evaluation)
+- [Context Optimization Pipeline](#-context-optimization-pipeline)
+  - [Near-Duplicate \& Semantic Redundancy](#1-near-duplicate--semantic-redundancy)
+  - [Redundant Info Collapse \& Noise Detection](#2-redundant-info-collapse--noise-detection)
+  - [Importance Separation \& Context Ranking](#3-importance-separation--context-ranking)
+  - [Final Context Scoring](#4-final-context-scoring)
+- [Development \& Testing](#-development--testing)
 - [Roadmap](#-roadmap)
 - [License](#-license)
 
@@ -44,45 +50,38 @@
 
 It is designed to give complete visibility into how text cleaning, tokenization, TF-IDF vectorization, Naive Bayes/Logistic Regression classification, entity extraction, intent recognition, and semantic similarity engines work under the hood.
 
-> [!NOTE]
+> [!IMPORTANT]
 > **Zero Heavy Wrapper Dependencies**: NOLQERA's core algorithms run with zero bloat, pure mathematical precision, and full test coverage.
 
 ---
 
 ## 🏗 Architecture & Engine Design
 
-```text
-                                    ┌────────────────────────┐
-                                    │    Input Raw Text      │
-                                    └───────────┬────────────┘
-                                                │
-                                                ▼
-                                    ┌────────────────────────┐
-                                    │ Preprocessing Pipeline │
-                                    │ (Clean/Stem/Lemmatize) │
-                                    └───────────┬────────────┘
-                                                │
-                                                ▼
-                                    ┌────────────────────────┐
-                                    │ Tokenization & Features│
-                                    │ (N-Grams / BoW / TFIDF)│
-                                    └───────────┬────────────┘
-                                                │
-                                                ▼
-         ┌──────────────────────────────────────┼──────────────────────────────────────┐
-         │                                      │                                      │
-         ▼                                      ▼                                      ▼
-┌─────────────────┐                    ┌─────────────────┐                    ┌─────────────────┐
-│ Machine Learning│                    │ Intelligence    │                    │ Embedding       │
-│ Classification  │                    │ Engines         │                    │ Providers       │
-├─────────────────┤                    ├─────────────────┤                    ├─────────────────┤
-│ • Naive Bayes   │                    │ • Relevance     │                    │ • TF-IDF Vector │
-│ • Logistic Reg. │                    │ • Importance    │                    │ • Transformer   │
-│ • Metrics/Report│                    │ • Keyphrase     │                    │   Adapter       │
-└─────────────────┘                    │ • Entity (NER)  │                    └─────────────────┘
-                                       │ • Intent        │
-                                       │ • Semantic Sim. │
-                                       └─────────────────┘
+NOLQERA is structured into modular layers, separating core text features from the intelligence suite and advanced context optimization strategies:
+
+```mermaid
+flowchart TD
+    RawText[Input Raw Text] --> Preprocess[Preprocessing Pipeline]
+    Preprocess --> Tokenize[Tokenization & Features]
+    
+    subgraph Core ML
+        Tokenize --> NB[Naive Bayes]
+        Tokenize --> LR[Logistic Regression]
+    end
+    
+    subgraph Intelligence Suite
+        Tokenize --> Relevance[Relevance Engine]
+        Tokenize --> Importance[Importance Engine]
+        Tokenize --> Keyphrase[Keyphrase Engine]
+        Tokenize --> Entities[Entity NER Engine]
+        Tokenize --> Intent[Intent Classifier]
+        Tokenize --> Semantic[Similarity Engine]
+    end
+    
+    subgraph Retrieval Quality & Context Optimization
+        Relevance --> RetrievalQuality[Retrieval Quality Pipeline]
+        Semantic --> ContextOptimization[Context Optimization Pipeline]
+    end
 ```
 
 ---
@@ -91,16 +90,13 @@ It is designed to give complete visibility into how text cleaning, tokenization,
 
 | Capability | Component | Description | Status |
 | :--- | :--- | :--- | :---: |
-| **Preprocessing** | `nolqera.preprocessing` | HTML stripping, URL removal, stemming, lemmatization, custom pipeline | 🟢 `Done` |
-| **Tokenization** | `nolqera.tokenization` | Sentence tokenizer, Word tokenizer (handles emoji, unicode, contractions, Tanglish) | 🟢 `Done` |
+| **Preprocessing** | `nolqera.preprocessing` | HTML stripping, URL removal, stemming, lemmatization | 🟢 `Done` |
+| **Tokenization** | `nolqera.tokenization` | Sentence & Word tokenizers (Emoji, contraction & Tanglish support) | 🟢 `Done` |
 | **Vectorization** | `nolqera.features` | BoW, N-Grams, Mathematical TF-IDF Vectorizer with IDF smoothing | 🟢 `Done` |
-| **Classification** | `nolqera.classification` | Multinomial Naive Bayes, Logistic Regression (Gradient Descent, Cross-Entropy) | 🟢 `Done` |
-| **Relevance** | `nolqera.intelligence.relevance` | TF-IDF + Cosine similarity query-sentence relevance ranker | 🟢 `Done` |
-| **Importance** | `nolqera.intelligence.importance` | Centrality sentence ranking with positional bias & informateness density | 🟢 `Done` |
-| **Keyphrase** | `nolqera.intelligence.keyphrase` | N-gram phrase candidate extractor & deduplicated keyphrase ranker | 🟢 `Done` |
-| **Entity (NER)** | `nolqera.intelligence.entities` | Contextual entity detector (`PERSON`, `LOCATION`, `ORGANIZATION`) & span cleaner | 🟢 `Done` |
-| **Intent** | `nolqera.intelligence.intent` | Interrogative signal detector, confidence-weighted intent classification | 🟢 `Done` |
-| **Semantic Sim** | `nolqera.intelligence.semantic_similarity` | Cosine similarity engine supporting TF-IDF & Transformer embedding providers | 🟢 `Done` |
+| **Classification** | `nolqera.classification` | Multinomial Naive Bayes, Logistic Regression | 🟢 `Done` |
+| **Intelligence Suite** | `nolqera.intelligence` | Relevance, Importance, Keyphrase, NER, Intent, and Similarity Engines | 🟢 `Done` |
+| **Retrieval Quality** | `nolqera.intelligence.retrieval_quality` | Query preprocessing, score normalization, candidate retrieval, filtering, diversity, reranking, and evaluation metrics | 🟢 `Done` |
+| **Context Optimization** | `nolqera.intelligence.context_optimization` | Near-duplicate detection, semantic redundancy, information collapse, noise filtering, importance separation, ranking, and scorer | 🟢 `Done` |
 
 ---
 
@@ -276,18 +272,260 @@ print(f"Similarity: {result.score:.4f} | {result.text_a} <-> {result.text_b}")
 
 ---
 
+## 🛡️ Retrieval Quality Pipeline
+
+Located under `nolqera.intelligence.retrieval_quality`, this pipeline enforces semantic sanity, normalizes search scoring metrics, filters out low-relevance results, and structures search quality evaluations.
+
+```mermaid
+flowchart LR
+    Query[Raw Query] --> QP[Query Preprocessing]
+    QP --> CR[Candidate Retrieval]
+    CR --> SN[Score Normalization]
+    SN --> RF[Result Filter]
+    RF --> D[Deduplication & Diversity]
+    D --> RR[Reranking]
+    RR --> Evaluated[Evaluation Metrics]
+```
+
+<details>
+<summary><b>1. Query Preprocessing</b></summary>
+
+Preprocesses search queries to extract semantic root tokens by standardizing case, removing punctuation, and filtering stopwords:
+
+```python
+from nolqera.intelligence.retrieval_quality.query_preprocessing import preprocess_query
+
+query = "What is the best way to deploy a FastAPI backend?!"
+tokens = preprocess_query(query)
+print("Tokens:", tokens)  # Output: ['best', 'way', 'deploy', 'fastapi', 'backend']
+```
+</details>
+
+<details>
+<summary><b>2. Score Normalization</b></summary>
+
+Maps disparate raw retrieval scores into a strict, unified `[0.0, 1.0]` range using Min-Max scaling across candidates:
+
+```python
+from nolqera.intelligence.retrieval_quality.score_normalization import ScoreNormalizer
+from nolqera.intelligence.semantic_search.models import SemanticSearchResult
+
+results = [
+    SemanticSearchResult(index=0, text="Doc A", score=0.4),
+    SemanticSearchResult(index=1, text="Doc B", score=0.6),
+    SemanticSearchResult(index=2, text="Doc C", score=0.8),
+]
+
+normalizer = ScoreNormalizer()
+normalized = normalizer.normalize(results)
+for doc in normalized:
+    print(f"{doc.text}: Raw={doc.original_score} -> Normalized={doc.score}")
+```
+</details>
+
+<details>
+<summary><b>3. Candidate Retrieval</b></summary>
+
+Fetches candidates matching a query based on a minimum overlap threshold of query tokens:
+
+```python
+from nolqera.intelligence.retrieval_quality.candidate_retrieval import CandidateRetriever
+from nolqera.intelligence.semantic_search.models import SemanticSearchResult
+
+candidates = [
+    SemanticSearchResult(index=0, text="fastapi python backend web server", score=0.9),
+    SemanticSearchResult(index=1, text="unrelated database table design", score=0.1),
+]
+
+retriever = CandidateRetriever(min_token_overlap=1)
+matched = retriever.retrieve("fastapi backend", candidates)
+print("Matched Candidates:", [m.text for m in matched])
+```
+</details>
+
+<details>
+<summary><b>4. Result Filtering</b></summary>
+
+Prunes candidates failing to meet a minimum normalized similarity score threshold:
+
+```python
+from nolqera.intelligence.retrieval_quality.result_filter import ResultFilter
+from nolqera.intelligence.semantic_search.models import SemanticSearchResult
+
+results = [
+    SemanticSearchResult(index=0, text="high quality match", score=0.95),
+    SemanticSearchResult(index=1, text="low quality noise", score=0.32),
+]
+
+filtered = ResultFilter().filter(results, min_score=0.50)
+print("Filtered results:", [f.text for f in filtered]) # Output: ["high quality match"]
+```
+</details>
+
+<details>
+<summary><b>5. Deduplication & Diversity</b></summary>
+
+Reduces keyword redundancy and enforces diversity by calculating lexical overlap using Jaccard Similarity:
+
+```python
+from nolqera.intelligence.retrieval_quality.deduplication import deduplicate_results
+from nolqera.intelligence.retrieval_quality.diversity import diversify_results
+from nolqera.intelligence.semantic_search.models import SemanticSearchResult
+
+results = [
+    SemanticSearchResult(index=0, text="fastapi backend server", score=0.9),
+    SemanticSearchResult(index=1, text="fastapi backend server", score=0.8), # Duplicate text
+    SemanticSearchResult(index=2, text="fastapi backend services", score=0.7), # High similarity
+]
+
+deduped = deduplicate_results(results)
+diversified = diversify_results(deduped, similarity_threshold=0.5)
+
+print("Diversified:", [d.text for d in diversified])
+```
+</details>
+
+<details>
+<summary><b>6. Reranking & Evaluation</b></summary>
+
+Enhances retrieval quality using keyword overlap weights and provides metrics like Precision@K, Recall@K, Hit Rate, and Mean Reciprocal Rank (MRR):
+
+```python
+from nolqera.intelligence.retrieval_quality.reranking import rerank_results
+from nolqera.intelligence.retrieval_quality.evaluation import precision_at_k, mean_reciprocal_rank
+
+results = [
+    SemanticSearchResult(index=0, text="MongoDB database storage", score=0.9),
+    SemanticSearchResult(index=1, text="Python backend framework", score=0.7),
+]
+
+# Rerank prioritizing "Python backend" query
+reranked = rerank_results("Python backend", results, relevance_weight=0.5, keyword_weight=0.5)
+
+# Calculate Precision@K
+print("Precision@1:", precision_at_k(retrieved=[1, 0], relevant={1}, k=1))
+```
+</details>
+
+---
+
+## ⚙️ Context Optimization Pipeline
+
+Located under `nolqera.intelligence.context_optimization`, this module maximizes the information density of LLM contexts by collapsing semantic redundancy, isolating signal from noise, and ranking components by combined relevance & importance weights.
+
+```mermaid
+flowchart TD
+    ScoredResults[Raw Retrieval Results] --> NearDup[Near-Duplicate Filter]
+    NearDup --> SemRedundancy[Semantic Redundancy Collapse]
+    SemRedundancy --> NoiseDet[Alphanumeric Noise Detection]
+    NoiseDet --> Sep[Importance Separation]
+    Sep --> Ranker[Context Ranker & Weights]
+    Ranker --> Output[Optimized Context Block]
+```
+
+<details>
+<summary><b>1. Near-Duplicate & Semantic Redundancy</b></summary>
+
+Identifies and removes duplicate textual representations using lexical Jaccard metrics and vector embedding distance checks:
+
+```python
+from nolqera.intelligence.context_optimization.near_duplicate import is_near_duplicate
+from nolqera.intelligence.context_optimization.semantic_redundancy import detect_semantic_redundancy
+from nolqera.intelligence.semantic_similarity.engine import SemanticSimilarityEngine
+from nolqera.intelligence.semantic_similarity.embeddings.tfidf import TFIDFEmbeddingProvider
+
+# 1. Lexical Near-Duplicate Check
+print(is_near_duplicate("FastAPI is a Python framework.", "FastAPI is a Python framework!")) # True
+
+# 2. Semantic Redundancy check using Embeddings
+provider = TFIDFEmbeddingProvider()
+provider.fit([["fastapi", "modern", "api", "framework", "python", "backend"]])
+engine = SemanticSimilarityEngine(provider)
+
+redundant = detect_semantic_redundancy(
+    "FastAPI is a Python backend framework",
+    "FastAPI is a modern Python API framework",
+    engine,
+    similarity_threshold=0.9
+)
+print("Is Semantically Redundant:", redundant) # True
+```
+</details>
+
+<details>
+<summary><b>2. Redundant Info Collapse & Noise Detection</b></summary>
+
+Collapses multiple redundant items into single representative items, and filters out low-information strings (such as strings composed entirely of punctuation or missing alphanumeric tokens):
+
+```python
+from nolqera.intelligence.context_optimization.redundant_information_collapse import collapse_redundant_information
+from nolqera.intelligence.context_optimization.noise_detection import NoiseDetector
+from nolqera.intelligence.semantic_search.models import SemanticSearchResult
+
+# Remove low-information / punctuation-only noise
+detector = NoiseDetector(min_meaningful_tokens=2)
+result = object.__new__(SemanticSearchResult)
+object.__setattr__(result, "text", "!!! ??? ...")
+print("Is Noise:", detector.is_noise(result)) # True
+```
+</details>
+
+<details>
+<summary><b>3. Importance Separation & Context Ranking</b></summary>
+
+Splits retrieved blocks into important and unnecessary components based on thresholds, and scores contexts using combined relevance & importance weights:
+
+```python
+from nolqera.intelligence.context_optimization.importance_separation import ImportanceSeparator
+from nolqera.intelligence.context_optimization.context_ranking import ContextRanker
+from nolqera.intelligence.semantic_search.models import SemanticSearchResult
+
+results = [
+    SemanticSearchResult(index=0, text="JWT Auth Security details", score=0.9),
+    SemanticSearchResult(index=1, text="Creator biography notes", score=0.2),
+]
+
+# Separate by Importance
+separator = ImportanceSeparator(importance_threshold=0.5)
+important, unnecessary = separator.separate(results)
+
+# Rank contexts using weights
+ranker = ContextRanker(relevance_weight=0.7, importance_weight=0.3)
+ranked_contexts = ranker.rank(results, importance_scores=[0.95, 0.15])
+```
+</details>
+
+<details>
+<summary><b>4. Final Context Scoring</b></summary>
+
+Fuses relevance, diversity, and redundancy signals into a unified contextual metric used to index and select final search results:
+
+```python
+from nolqera.intelligence.context_optimization.final_context_scoring import FinalContextScorer
+from nolqera.intelligence.semantic_search.models import SemanticSearchResult
+
+scorer = FinalContextScorer(relevance_weight=0.6, diversity_weight=0.3, redundancy_weight=0.1)
+result = SemanticSearchResult(index=0, text="React frontend details", score=0.85)
+
+final_score = scorer.score(result, diversity=0.9, redundancy=0.05)
+print("Final Context Score:", final_score.score)
+```
+</details>
+
+---
+
 ## 🧪 Development & Testing
 
-NOLQERA is built using strict test-driven development (TDD) with over 320+ unit and integration tests.
+NOLQERA is built using strict test-driven development (TDD) with over **650+ unit and integration tests** validating math, constraints, and pipelines.
 
 ```powershell
 # Run the complete test suite
 pytest -v
 
-# Run tests for specific intelligence engines
-pytest tests/test_semantic_similarity_engine.py -v -s
-pytest tests/test_entity_engine.py -v -s
-pytest tests/test_intent_engine.py -v -s
+# Run tests for specific context optimization modules
+pytest tests/test_context_ranking.py -v -s
+pytest tests/test_redundant_information_collapse.py -v -s
+pytest tests/test_noise_detection.py -v -s
 ```
 
 ---
@@ -298,8 +536,9 @@ pytest tests/test_intent_engine.py -v -s
 - [x] **Phase 2 — Text Statistics & Vocabulary**: Vocabulary Manager (`UNK`), Readability scores, Lexical Diversity (TTR).
 - [x] **Phase 3 — Machine Learning NLP**: Naive Bayes, Logistic Regression (Gradient Descent, Cross-Entropy), Metrics & Reports.
 - [x] **Phase 4 — NOLQERA Intelligence Suite**: Relevance, Importance, Keyphrase, Entity, Intent, and Semantic Similarity Engines.
-- [ ] **Phase 5 — Neural Embeddings**: Custom Word2Vec (Skip-gram, CBOW), Dense Vector Store.
-- [ ] **Phase 6 — Transformers & RAG**: Attention mechanisms, Vector Search Indexing, RAG Pipeline.
+- [x] **Phase 5 — Retrieval Quality & Context Optimization**: Precision/Recall metrics, candidate filters, Jaccard diversity, redundancy collapsing, importance separation, context ranking.
+- [ ] **Phase 6 — Neural Embeddings**: Custom Word2Vec (Skip-gram, CBOW), Dense Vector Store.
+- [ ] **Phase 7 — Transformers & RAG**: Attention mechanisms, Vector Search Indexing, RAG Pipeline.
 
 ---
 
