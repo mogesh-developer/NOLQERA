@@ -1,0 +1,469 @@
+# NOLQERA Error Resolution & Prevention Guide
+
+This document captures all the errors encountered during the implementation and integration of the Semantic Search engine, their root causes, step-by-step solutions, and best practices to prevent them in the future.
+
+---
+
+## 1. Accidental Deletion of Source Directories
+### Error
+Files under `nolqera/intelligence/semantic_similarity/` were deleted, resulting in broken imports and test execution failures.
+
+### Root Cause
+An accidental directory removal or command sequence deleted the existing package directory before creating the new `semantic_search` directory.
+
+### How to Fix
+Restore the deleted folder tracking from the Git index:
+```powershell
+git restore nolqera/intelligence/semantic_similarity
+```
+
+### How to Avoid in Future
+* **Review Working Trees**: Run `git status` before execution of destructive commands.
+* **Safer File Management**: Use Git-integrated commands or IDE workspaces to perform moves and renames rather than shell commands (`rm`, `Remove-Item`) to prevent unintended deletions.
+
+---
+
+## 2. Missing Test Files / Test Discovery Failures
+### Error
+Executing tests directly failed with:
+`ERROR: file or directory not found: tests/test_semantic_search_models.py`
+
+### Root Cause
+Attempting to run a test file that had not yet been created in the `tests/` directory.
+
+### How to Fix
+Create the missing test file (e.g., [test_semantic_search_models.py](file:///d:/nolqera/tests/test_semantic_search_models.py)) to verify models validations like `SemanticSearchResult`.
+
+### How to Avoid in Future
+* Follow a test-driven or test-aligned development workflow: when creating a module `nolqera/intelligence/semantic_search/models.py`, immediately create `tests/test_semantic_search_models.py`.
+
+---
+
+## 3. Pytest Discovery Typo
+### Error
+Running `pytest tests/test_semantic_search_engine.py` returned:
+`ERROR: file or directory not found: tests/test_semantic_search_engine.py`
+
+### Root Cause
+The file was accidentally named `est_semantic_search_engine.py` instead of `test_semantic_search_engine.py` (missing the leading `t`). Pytest requires test files to begin with `test_` or end with `_test` for automatic discovery.
+
+### How to Fix
+Rename the file to prepend the missing `t`:
+```powershell
+Rename-Item -Path .\tests\est_semantic_search_engine.py -NewName test_semantic_search_engine.py
+```
+
+### How to Avoid in Future
+* Double-check spelling and prefixes during file creation.
+* Configure IDE file templates to automatically prefix test file generation.
+
+---
+
+## 4. Inconsistent Embedding Provider Signatures (TypeError)
+### Error
+Running search/similarity engines threw:
+* `TypeError: tokens must be a list` (when using TFIDF)
+* `TypeError: text must be a string` (when using Transformer)
+
+### Root Cause
+The base class `EmbeddingProvider` expects tokenized lists (`list[str]`) for `embed()` and `list[list[str]]` for `embed_many()`. However:
+1. `TFIDFEmbeddingProvider` expects pre-tokenized token lists.
+2. `TransformerEmbeddingProvider` overrides these methods to accept raw strings (`str` and `list[str]`), violating the strict Liskov Substitution Principle (LSP).
+
+As a result, engines attempting to query both providers transparently would fail when passing tokenized lists to `Transformer` or raw strings to `TFIDF`.
+
+### How to Fix
+Introduce dynamic type/provider checks in engines ([engine.py](file:///d:/nolqera/nolqera/intelligence/semantic_search/engine.py) and [engine.py](file:///d:/nolqera/nolqera/intelligence/semantic_similarity/engine.py)) to adapt inputs:
+```python
+if self._embedding_provider.__class__.__name__ == "TransformerEmbeddingProvider":
+    # Transformer expects raw string / sentences
+    query_vector = self._embedding_provider.embed(query)
+    document_vectors = self._embedding_provider.embed_many(documents)
+else:
+    # TFIDF expects lists of tokens
+    query_vector = self._embedding_provider.embed(tokenize_words(query))
+    document_vectors = self._embedding_provider.embed_many(
+        [tokenize_words(doc) for doc in documents]
+    )
+```
+
+### How to Avoid in Future
+* **Unify Interfaces**: Align the base `EmbeddingProvider` contract to either always accept raw strings (and tokenize internally if needed) or always accept lists of tokens.
+* **Consistent Signatures**: Avoid overriding base methods with differing input type constraints.
+
+---
+
+## 5. Missing Positional Constructor Arguments in Tests
+### Error
+`TypeError: TransformerEmbeddingProvider.__init__() missing 1 required positional argument: 'model_name'`
+
+### Root Cause
+In [test_semantic_search_transformer.py](file:///d:/nolqera/tests/test_semantic_search_transformer.py), `TransformerEmbeddingProvider()` was instantiated without arguments, but its constructor expects a `model_name` (e.g. `"all-MiniLM-L6-v2"`).
+
+### How to Fix
+Assign a sensible default value (e.g. `"all-MiniLM-L6-v2"`) directly in the constructor of `TransformerEmbeddingProvider`:
+```python
+    def __init__(
+        self,
+        model_name: str = "all-MiniLM-L6-v2",
+    ) -> None:
+```
+
+### How to Avoid in Future
+* **Stubbing/Fixtures**: Use pytest fixtures to centralize instantiation of components with standard parameters.
+* **Sensible Defaults**: Define sensible default values in constructors for optional/configurable dependencies to improve robustness and reduce setup boilerplate.
+
+---
+
+## 6. Incorrect Module Import Path (ModuleNotFoundError)
+### Error
+```
+ImportError while importing test module 'D:\nolqera\tests\test_semantic_search_index.py'.
+...
+ModuleNotFoundError: No module named 'nolqera.intelligence.semantic_search.embeddings'
+```
+
+### Root Cause
+The test suite [test_semantic_search_index.py](file:///d:/nolqera/tests/test_semantic_search_index.py) attempted to import `TFIDFEmbeddingProvider` from `nolqera.intelligence.semantic_search.embeddings.tfidf`, but the embedding providers are located under the `semantic_similarity` package (`nolqera.intelligence.semantic_similarity.embeddings.tfidf`).
+
+### How to Fix
+Correct the import path to reference `semantic_similarity` instead of `semantic_search`:
+```python
+from nolqera.intelligence.semantic_similarity.embeddings.tfidf import (
+    TFIDFEmbeddingProvider,
+)
+```
+
+### How to Avoid in Future
+* **Verification of Package Structures**: Double-check package namespaces, specifically differentiating sibling packages like `semantic_similarity` and `semantic_search`.
+* **Static Analysis**: Rely on IDE import auto-completion or run static analysis (like `pylint` or `mypy`) to detect invalid module paths before running tests.
+
+---
+
+## 7. IndentationError & Missing Mutation Index Updates in SemanticSearchIndex
+### Error
+```
+E   IndentationError: expected an indented block after function definition on line 190
+```
+And running tests showed `AttributeError` or missing documents in search results because vectors were not updated.
+
+### Root Cause
+1. **IndentationError**: The method definition `add_document` was accidentally indented under `search` with 8 spaces instead of 4 spaces.
+2. **Missing Vector Updates**: When a document is added via `add_document` or `add_documents`, only the raw string document was appended to `self._documents` but no corresponding embedding vector was computed and added to `self._document_vectors`. Since `search` matches documents and vectors via `zip()`, newly mutated documents were never returned in search results.
+
+### How to Fix
+1. Standardize indentation of `add_document` to 4 spaces.
+2. Update the document vector list upon mutations by embedding the added documents using the active embedding provider:
+```python
+    def add_document(self, document: str) -> None:
+        ...
+        self._documents.append(document)
+        if self._embedding_provider.__class__.__name__ == "TransformerEmbeddingProvider":
+            vector = self._embedding_provider.embed(document)
+        else:
+            vector = self._embedding_provider.embed(tokenize_words(document))
+        self._document_vectors.append(vector)
+```
+
+### How to Avoid in Future
+* **Syntax Checks**: Run unit tests or syntax checks (`python -m py_compile`) immediately after refactoring code.
+* **Keep State Synchronized**: When maintaining parallel lists or structures in a class (like documents and their precomputed embeddings), ensure all mutating methods update all relevant structures atomically to keep them in sync.
+
+---
+
+## 8. Missing Fixtures & Incomplete test_semantic_search_index_removal.py
+### Error
+Running `pytest tests/test_semantic_search_index_removal.py` would fail due to:
+* Missing `index` fixture (the tests take it as an argument, but it wasn't defined).
+* Class method implementation code (`remove_document`) mistakenly copy-pasted at the bottom of the test file instead of inside `index.py`.
+
+### Root Cause
+1. **Implementation Placement**: The logic for removing documents was placed at the bottom of the test file instead of the actual `SemanticSearchIndex` class.
+2. **Missing Test Setup**: Necessary test imports (like `TFIDFEmbeddingProvider`) and the fixture defining `index` were missing, rendering the test suite un-executable.
+
+### How to Fix
+1. Move the `remove_document(self, index: int)` implementation inside [index.py](file:///d:/nolqera/nolqera/intelligence/semantic_search/index.py):
+```python
+    def remove_document(self, index: int) -> None:
+        if not isinstance(index, int):
+            raise TypeError("index must be an integer")
+        if index < 0:
+            raise ValueError("index cannot be negative")
+        if index >= len(self._documents):
+            raise IndexError("index out of range")
+        self._documents.pop(index)
+        self._document_vectors.pop(index)
+```
+2. Rewrite the test file [test_semantic_search_index_removal.py](file:///d:/nolqera/tests/test_semantic_search_index_removal.py) to declare the `index` fixture correctly and clean up the extra implementation code at the bottom.
+
+### How to Avoid in Future
+* **Proper Modularization**: Always write component/class logic inside the core library package (`nolqera/intelligence/...`) and restrict test files strictly to test configurations and assertions.
+* **Reusable Setup**: Write shared pytest fixtures or mock structures to cleanly prepare test scenarios.
+
+---
+
+## 9. Indentation Errors & Vocabulary Mismatch in test_semantic_search_index_update.py
+### Error
+Running `pytest tests/test_semantic_search_index_update.py` would throw:
+* `AttributeError: 'SemanticSearchIndex' object has no attribute 'update_document'`
+* `AssertionError: assert 0 == 1` when validating search results after updating a document.
+
+### Root Cause
+1. **Indentation Error**: The method `update_document` in `index.py` was defined with a `0` spaces indentation at the module level rather than inside the `SemanticSearchIndex` class structure (which expects a `4` spaces indentation).
+2. **Vocabulary Mismatch**: The updated terms `"updated"` and `"document"` were not included during the fit phase of the `TFIDFEmbeddingProvider` in the test fixture. Therefore, they were treated as out-of-vocabulary (ignored) during search, leading to an all-zeros vector and incorrect search similarity rankings.
+
+### How to Fix
+1. Properly indent the `update_document` method with `4` spaces (and its body with `8` spaces) inside `SemanticSearchIndex` ([index.py](file:///d:/nolqera/nolqera/intelligence/semantic_search/index.py)).
+2. Include the new/updated query terms (e.g., `["updated", "document"]`) in the fit phase of the `TFIDFEmbeddingProvider` in the test fixture:
+```python
+    provider.fit([
+        ...,
+        ["updated", "document"]
+    ])
+```
+
+### How to Avoid in Future
+* **Structure Consistency**: Always double-check indentation levels when copying or defining class methods to keep them scoped correctly inside class declarations.
+* **Vocabulary Coverage**: When testing index searches using vocabulary-based providers (like TF-IDF), make sure any terms used in updated documents or search queries are included in the dataset when fitting the vocabulary.
+
+---
+
+## 10. Missing Fixtures & Displaced Code in test_semantic_search_index_persistence.py
+### Error
+Running `pytest tests/test_semantic_search_index_persistence.py` would fail with:
+* `fixture 'index' not found`
+* `ModuleNotFoundError: No module named 'nolqera.intelligence.semantic_search.persistence'`
+
+### Root Cause
+1. **Missing Fixture**: The test suite requested the `index` fixture but did not declare it or import the needed classes.
+2. **Misplaced Implementation**: The actual implementation of `SemanticSearchPersistence` was written inside a test folder file (`tests/test_semantic_search_persistence.py`) instead of the source package location (`nolqera/intelligence/semantic_search/persistence.py`), leaving the library's `persistence.py` file completely empty.
+
+### How to Fix
+1. Move the `SemanticSearchPersistence` class to [persistence.py](file:///d:/nolqera/nolqera/intelligence/semantic_search/persistence.py) and remove `tests/test_semantic_search_persistence.py`.
+2. Define the `index` fixture (using `TFIDFEmbeddingProvider` fitted on mock documents) at the top of [test_semantic_search_index_persistence.py](file:///d:/nolqera/tests/test_semantic_search_index_persistence.py).
+
+### How to Avoid in Future
+* **Clean Code Separation**: Strictly separate source implementation files (`nolqera/`) from testing scripts (`tests/`).
+* **Fixture Boilerplate**: When writing tests that accept custom class instances (like `index`), always ensure a corresponding `@pytest.fixture` setup exists in the file or `conftest.py`.
+
+---
+
+## 11. Missing Fixtures in test_semantic_search_service.py
+### Error
+Running `pytest tests/test_semantic_search_service.py` failed with:
+* `fixture 'index' not found`
+
+### Root Cause
+The test file [test_semantic_search_service.py](file:///d:/nolqera/tests/test_semantic_search_service.py) took `index` as a fixture argument for testing `SemanticSearchService` operations but did not define the `index` fixture itself, leading to pytest setup errors.
+
+### How to Fix
+Add the `index` fixture at the top of [test_semantic_search_service.py](file:///d:/nolqera/tests/test_semantic_search_service.py), instantiating `SemanticSearchIndex` with a mock `TFIDFEmbeddingProvider` fitted on all mock document words used across the tests.
+
+### How to Avoid in Future
+* **Scope Definition**: Ensure every test file that relies on external component fixtures has them declared locally or registered in a shared `conftest.py` file within the test package.
+* **Fit Vocabulary Requirements**: Ensure the vocabularies of mock providers are properly configured to support all operations tested inside the service suite.
+
+---
+
+## 12. Missing Fixtures in test_semantic_search_service_validation.py
+### Error
+Running `pytest tests/test_semantic_search_service_validation.py` failed with:
+* `fixture 'service' not found`
+
+### Root Cause
+The test file [test_semantic_search_service_validation.py](file:///d:/nolqera/tests/test_semantic_search_service_validation.py) expected the `service` fixture to test input validations of `SemanticSearchService.search()` but failed to define it.
+
+### How to Fix
+Add the `service` fixture at the top of [test_semantic_search_service_validation.py](file:///d:/nolqera/tests/test_semantic_search_service_validation.py), declaring a configured `SemanticSearchService` initialized with a `SemanticSearchIndex` and mock `TFIDFEmbeddingProvider`.
+
+### How to Avoid in Future
+* Always verify that all dependencies or custom argument names passed into tests are either declared locally as pytest fixtures or globally registered in `conftest.py`.
+
+---
+
+## 13. Missing save/load Methods in SemanticSearchService
+### Error
+Running `pytest tests/test_semantic_search_service_persistence.py` failed with:
+* `AttributeError: 'SemanticSearchService' object has no attribute 'save'`
+
+### Root Cause
+The `save` and `load` methods were accidentally deleted from `service.py`, but the service persistence tests actively call `service.save(...)` and `service.load(...)` to verify saving/loading operations.
+
+### How to Fix
+Implement `save(self, path: str)` and `load(self, path: str) -> SemanticSearchService` inside `SemanticSearchService` ([service.py](file:///d:/nolqera/nolqera/intelligence/semantic_search/service.py)) to delegate the persistence requests to the underlying index instance:
+```python
+    def save(self, path: str) -> None:
+        self._index.save(path)
+
+    def load(self, path: str) -> "SemanticSearchService":
+        self._index.load(path)
+        return self
+```
+
+### How to Avoid in Future
+* Ensure that public APIs, especially those covered by existing test files, are not accidentally modified or deleted during refactoring.
+* Run the entire test suite globally before submitting changes to ensure no APIs are broken.
+
+---
+
+## 14. Floating Point Precision Assertions in Score Normalization Tests
+### Error
+Running `pytest tests/test_score_normalization.py` failed with an `AssertionError` at `test_min_max_normalization`:
+```
+E       AssertionError: assert [0.0, 0.4999999999999999, 1.0] == [0.0, 0.5, 1.0]
+E
+E         At index 1 diff: 0.4999999999999999 != 0.5
+```
+
+### Root Cause
+Min-max normalization involves floating-point division (`(score - minimum) / (maximum - minimum)`). Due to standard IEEE 754 floating-point limits, computations can yield values like `0.4999999999999999` instead of exact values like `0.5`. Direct comparison using `==` fails in tests.
+
+### How to Fix
+Wrap the expected list or values using `pytest.approx()` inside the test:
+```python
+    assert scores == pytest.approx([
+        0.0,
+        0.5,
+        1.0,
+    ])
+```
+
+### How to Avoid in Future
+* **Use Approximate Comparisons for Floats**: Always use `pytest.approx()` (or `math.isclose` in plain Python) when comparing calculated floating-point numbers in unit tests.
+* **Avoid Strict Equality with Floats**: Never use strict equality (`==`) to assert floating-point results derived from arithmetic operations.
+
+---
+
+## 15. Incorrect Expected Value in Mean Reciprocal Rank (MRR) Test
+### Error
+Running `pytest tests/test_retrieval_evaluation.py` failed with an `AssertionError` at `test_mean_reciprocal_rank`:
+```
+E         comparison failed
+E         Obtained: 0.6666666666666666                                                        
+E         Expected: 0.75 ± 7.5e-07
+```
+
+### Root Cause
+In `test_mean_reciprocal_rank`, the second query's retrieved items were `[4, 5, 6]`, and the relevant set was `{6}` (which was at rank position 3, reciprocal rank `1 / 3 = 0.3333333333333333`). The first query had a reciprocal rank of `1.0`. The mean reciprocal rank should have been `(1.0 + 1/3) / 2 = 0.6666666666666666`, but the test asserted that the MRR is `0.75`.
+
+### How to Fix
+Correct the second query's relevant set in the test from `{6}` to `{5}`. Since `5` is at rank position 2, its reciprocal rank is `1 / 2 = 0.5`, making the overall MRR `(1.0 + 0.5) / 2 = 0.75`.
+
+### How to Avoid in Future
+* **Double Check Mathematical Expected Values**: When writing test cases for evaluation metrics like Mean Reciprocal Rank (MRR), verify the math manually to ensure the expected values align with the inputs.
+
+---
+
+## 16. ModuleNotFoundError for context_optimization Due to Typo in Directory Name
+### Error
+Running `pytest tests/test_near_duplicate.py` failed with:
+```
+E   ModuleNotFoundError: No module named 'nolqera.intelligence.context_optimization'
+```
+
+### Root Cause
+The directory holding `near_duplicate.py` was named `context_optimizatio` (missing the trailing `n`), which prevented Python from importing modules from `nolqera.intelligence.context_optimization.near_duplicate` during test collection.
+
+### How to Fix
+Rename the directory from `context_optimizatio` to `context_optimization`.
+
+### How to Avoid in Future
+* **Double Check Directory Names**: Ensure that new module/package directories match the expected import paths and package naming conventions exactly.
+
+---
+
+## 17. TypeError: embedding_provider must implement EmbeddingProvider in Semantic Redundancy Tests
+### Error
+Running `pytest tests/test_semantic_redundancy.py` failed with 16 errors:
+```
+E           TypeError: embedding_provider must implement EmbeddingProvider
+```
+
+### Root Cause
+1. `FakeEmbeddingProvider` used in the test suite did not inherit from the base `EmbeddingProvider` class, failing the strict type check `isinstance(embedding_provider, EmbeddingProvider)` in `SemanticSimilarityEngine.__init__`.
+2. `detect_semantic_redundancy` was trying to invoke a non-existent method `similarity_engine.compute(first, second)` and access `result.similarity`, whereas `SemanticSimilarityEngine` exposes `compare(tokens_a, tokens_b)` and returns an object with a `.score` field.
+
+### How to Fix
+1. Inherit `FakeEmbeddingProvider` from `EmbeddingProvider` and import it in [test_semantic_redundancy.py](file:///d:/nolqera/tests/test_semantic_redundancy.py).
+2. Update the `embed()` signature of the fake provider to accept token list or string and join them to obtain the full text query.
+3. Update [semantic_redundancy.py](file:///d:/nolqera/nolqera/intelligence/context_optimization/semantic_redundancy.py) to tokenize the strings using `tokenize_words()` and call `similarity_engine.compare(tokens_a, tokens_b)`, checking the result using `.score`.
+
+### How to Avoid in Future
+* **Match Interface Inheritance**: When mocking or creating test doubles for dependency injection, always inherit from the defined base class/interface so that runtime `isinstance` checks do not fail.
+* **Verify API Contract Alignment**: Double-check the public methods and attributes of engine/service contracts (e.g. `compare()` vs `compute()`, `score` vs `similarity`) before invoking them in dependent components.
+
+---
+
+## 18. AttributeError: 'SemanticSimilarityEngine' object has no attribute 'compute' and ValueError: score must be between 0 and 1 in Redundant Information Collapse Tests
+### Error
+Running `pytest tests/test_redundant_information_collapse.py` failed with:
+1. `AttributeError: 'SemanticSimilarityEngine' object has no attribute 'compute'`
+2. `ValueError: score must be between 0 and 1`
+
+### Root Cause
+1. `collapse_redundant_information` attempted to invoke a non-existent method `similarity_engine.compute(first, second)` and access `result.similarity`, whereas `SemanticSimilarityEngine` exposes `compare(tokens_a, tokens_b)` and returns an object with a `.score` field.
+2. In `tests/test_redundant_information_collapse.py`, `FakeEmbeddingProvider` did not inherit from `EmbeddingProvider` (causing type check failures in the engine's initialization), and mapped `"react is a frontend library"` to `[-1.0, 0.0]`. This caused cosine similarity calculation to yield `-1.0`, violating the `SemanticSimilarityResult` model's strict validation constraint that `score` must be in the `[0.0, 1.0]` range.
+
+### How to Fix
+1. Update [redundant_information_collapse.py](file:///d:/nolqera/nolqera/intelligence/context_optimization/redundant_information_collapse.py) to tokenize the strings using `tokenize_words()` and call `similarity_engine.compare(tokens_a, tokens_b)`, checking the result using `.score`.
+2. Update [test_redundant_information_collapse.py](file:///d:/nolqera/tests/test_redundant_information_collapse.py) to import and inherit `FakeEmbeddingProvider` from `EmbeddingProvider`.
+3. Increase the embedding dimension in the fake provider's mapping to 3D, assigning `[0.0, 0.0, 1.0]` to `"react is a frontend library"` to keep all semantic similarities within the valid `[0.0, 1.0]` range.
+
+### How to Avoid in Future
+* **Respect Model Constraints in Test Mocking**: When designing mock/fake datasets, ensure that the values generated satisfy all model schema validation constraints (e.g. range bounds, types) to prevent unexpected validation errors during assertions.
+
+---
+
+## 19. ValueError: text cannot be empty in Noise Detection Tests
+### Error
+Running `pytest tests/test_noise_detection.py` failed with:
+```
+E           ValueError: text cannot be empty
+```
+
+### Root Cause
+`test_detects_empty_text_as_noise` instantiated `SemanticSearchResult` with an empty string (`""`) using the helper `make_result("")`. However, the `SemanticSearchResult` class has a strict `__post_init__` validator that throws a `ValueError` when `text` is empty or whitespace-only.
+
+### How to Fix
+To test the behavior of the detector when encountering empty text, construct an uninitialized instance of the frozen dataclass `SemanticSearchResult` using `object.__new__(SemanticSearchResult)` and populate its fields using `object.__setattr__(result, field, value)`. This bypasses constructor validations while preserving the object type.
+
+### How to Avoid in Future
+* **Bypassing Dataclass Validators in Tests**: When it is necessary to test a component's resiliency against invalid state values that are blocked by validation at model creation time, use `object.__new__` and `object.__setattr__` to construct the object in the desired invalid state.
+
+---
+
+## 20. ValueError: score must be between 0 and 1 in Context Ranking Tests
+### Error
+Running `pytest tests/test_context_ranking.py` failed with:
+```
+E           ValueError: score must be between 0 and 1
+```
+
+### Root Cause
+`test_rejects_invalid_relevance_score` attempted to construct a `SemanticSearchResult` with an out-of-bounds score `1.5` using the `make_result` helper to verify that the `ContextRanker` rejects invalid scores. However, the constructor validator on `SemanticSearchResult` caught this and raised a `ValueError` during object initialization, preventing the actual test case from running.
+
+### How to Fix
+Construct the test target using `object.__new__(SemanticSearchResult)` and populate its attributes using `object.__setattr__` to bypass the dataclass constructor validation checks.
+
+### How to Avoid in Future
+* **By-passing Dataclass Constraints for Engine Verification**: To verify that down-stream service layers (such as rankers or classifiers) correctly validate their inputs independently of entity level checks, build raw instances with `object.__new__` and `object.__setattr__` to introduce mock data with invalid state parameters.
+
+---
+
+## 21. ModuleNotFoundError: No module named 'nolqera.intelligence.semantic_search.final_context_scoring'
+### Error
+Running `pytest tests/test_final_context_scoring.py` failed with:
+```
+E   ModuleNotFoundError: No module named 'nolqera.intelligence.semantic_search.final_context_scoring'
+```
+
+### Root Cause
+1. In `tests/test_final_context_scoring.py`, the import path was written as `nolqera.intelligence.semantic_search.final_context_scoring` but the implementation was located under `nolqera.intelligence.context_optimization.final_context_scoring`.
+2. Inside `nolqera/intelligence/context_optimization/final_context_scoring.py`, a relative import `from .models import SemanticSearchResult` was used, but the `models` file is under the package `nolqera.intelligence.semantic_search`, not `context_optimization`.
+
+### How to Fix
+1. Correct the import path in [test_final_context_scoring.py](file:///d:/nolqera/tests/test_final_context_scoring.py) to reference `context_optimization` instead of `semantic_search`.
+2. Correct the import inside [final_context_scoring.py](file:///d:/nolqera/nolqera/intelligence/context_optimization/final_context_scoring.py) to use the absolute import path: `from nolqera.intelligence.semantic_search.models import SemanticSearchResult`.
+
+### How to Avoid in Future
+* **Check Cross-package References**: When importing models or components between sibling packages (e.g. from `semantic_search` to `context_optimization`), avoid relative imports like `from .models` and use the full absolute path of the target package.

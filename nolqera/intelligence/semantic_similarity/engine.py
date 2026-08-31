@@ -51,13 +51,17 @@ class SemanticSimilarityEngine:
                 "tokens_b cannot be empty"
             )
 
-        vector_a = self._embedding_provider.embed(
-            tokens_a
-        )
+        if self._embedding_provider.__class__.__name__ == "TransformerEmbeddingProvider":
+            vector_a = self._embedding_provider.embed(" ".join(tokens_a))
+            vector_b = self._embedding_provider.embed(" ".join(tokens_b))
+        else:
+            vector_a = self._embedding_provider.embed(
+                tokens_a
+            )
+            vector_b = self._embedding_provider.embed(
+                tokens_b
+            )
 
-        vector_b = self._embedding_provider.embed(
-            tokens_b
-        )
 
         similarity = cosine_similarity(
             vector_a,

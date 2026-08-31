@@ -8,7 +8,7 @@ class TransformerEmbeddingProvider(EmbeddingProvider):
 
     def __init__(
         self,
-        model_name: str,
+        model_name: str = "all-MiniLM-L6-v2",
     ) -> None:
 
         if not isinstance(model_name, str):

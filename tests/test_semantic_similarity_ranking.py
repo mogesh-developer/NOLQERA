@@ -58,3 +58,92 @@ def test_top_k_returns_requested_items():
 
     assert len(top) == 1
     assert top[0].score == 0.9
+
+def test_rank_rejects_non_list():
+
+    ranker = SemanticSimilarityRanker()
+
+    try:
+        ranker.rank("invalid")
+        assert False
+    except TypeError:
+        pass
+
+
+def test_rank_rejects_empty_list():
+
+    ranker = SemanticSimilarityRanker()
+
+    try:
+        ranker.rank([])
+        assert False
+    except ValueError:
+        pass
+
+
+def test_rank_rejects_invalid_result():
+
+    ranker = SemanticSimilarityRanker()
+
+    try:
+        ranker.rank(["invalid"])
+        assert False
+    except TypeError:
+        pass
+
+
+def test_top_k_rejects_non_integer():
+
+    ranker = SemanticSimilarityRanker()
+
+    results = [
+        SemanticSimilarityResult(
+            text_a="A",
+            text_b="B",
+            score=0.9,
+        ),
+    ]
+
+    try:
+        ranker.top_k(results, "1")
+        assert False
+    except TypeError:
+        pass
+
+
+def test_top_k_rejects_zero():
+
+    ranker = SemanticSimilarityRanker()
+
+    results = [
+        SemanticSimilarityResult(
+            text_a="A",
+            text_b="B",
+            score=0.9,
+        ),
+    ]
+
+    try:
+        ranker.top_k(results, 0)
+        assert False
+    except ValueError:
+        pass
+
+
+def test_top_k_rejects_negative():
+
+    ranker = SemanticSimilarityRanker()
+
+    results = [
+        SemanticSimilarityResult(
+            text_a="A",
+            text_b="B",
+            score=0.9,
+        ),
+    ]
+
+    try:
+        ranker.top_k(results, -1)
+        assert False
+    except ValueError:
+        pass
