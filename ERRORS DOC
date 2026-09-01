@@ -691,3 +691,26 @@ fact_result = self.fact_preserver.validate(
 ### How to Avoid in Future
 * **Validate Preservation Against Deduplicated Baseline**: When verifying that downstream stages (like token budgeting or sentence selection) preserve critical content, compare against the deduplicated candidate set (`redundancy_selected`) rather than raw input containing duplicate entries.
 * **Align Test Helper Defaults**: Ensure test helpers set default configuration flags (such as `require_preservation`) appropriate for general pipeline unit testing, reserving explicit flag overrides for boundary/gate testing.
+
+---
+
+## 30. ModuleNotFoundError Due to Filename Typo in Pipeline Models Module
+### Error
+Running `pytest tests/test_pipeline_models.py` failed during collection with:
+```
+ModuleNotFoundError: No module named 'nolqera.intelligence.pipeline.models'
+```
+
+### Root Cause
+The Python source file defining `PipelineResult` and `PipelineMetadata` was accidentally created with a typo in its filename as `odels.py` (missing the leading `m`) instead of `models.py` inside `nolqera/intelligence/pipeline/`.
+
+### How to Fix
+Rename `odels.py` to `models.py`:
+```powershell
+Rename-Item -Path nolqera/intelligence/pipeline/odels.py -NewName models.py
+```
+And export `PipelineResult` and `PipelineMetadata` in [pipeline/\_\_init\_\_.py](file:///d:/nolqera/nolqera/intelligence/pipeline/__init__.py).
+
+### How to Avoid in Future
+* **Double Check File Prefixes & Names**: Verify that module filenames match their intended import package paths upon creation.
+* **Immediate Test Discovery Verification**: Run `pytest` immediately after file creation to catch missing module typos during test collection before writing unit test assertions.
