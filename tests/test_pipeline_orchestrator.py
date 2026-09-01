@@ -273,7 +273,9 @@ def test_pipeline_runs_context_compression():
 
 
 def test_pipeline_respects_max_sentences():
-    pipeline = create_pipeline()
+    pipeline = create_pipeline(
+        config=PipelineConfig(max_sentences=2)
+    )
 
     result = pipeline.process(
         query="Python",
@@ -360,3 +362,148 @@ def test_pipeline_preserves_original_input():
     )
 
     assert result.input_text == raw_input
+
+def create_pipeline(
+    config=None,
+):
+    semantic_search_engine = SemanticSearchEngine(
+        embedding_provider=FakeEmbeddingProvider()
+    )
+
+    importance_engine = ImportanceEngine()
+
+    keyphrase_engine = KeyphraseEngine()
+
+    entity_engine = EntityEngine()
+
+    intent_engine = IntentEngine()
+
+    noise_remover = NoiseRemover(
+        NoiseDetector()
+    )
+
+    context_ranker = ContextRankingAnalyzer(
+        ContextRanker()
+    )
+
+    context_compressor = ContextCompressor()
+
+    return NOLQERAPipeline(
+        semantic_search_engine=semantic_search_engine,
+        importance_engine=importance_engine,
+        keyphrase_engine=keyphrase_engine,
+        entity_engine=entity_engine,
+        intent_engine=intent_engine,
+        noise_remover=noise_remover,
+        context_ranker=context_ranker,
+        context_compressor=context_compressor,
+        config=config,
+    )
+def test_pipeline_uses_default_configuration():
+    pipeline = create_pipeline()
+
+    assert isinstance(
+        pipeline.config,
+        PipelineConfig,
+    )
+
+    assert pipeline.config.keyword_top_k == 5
+    assert pipeline.config.max_sentences == 3
+
+
+def test_pipeline_accepts_custom_configuration():
+    config = PipelineConfig(
+        keyword_top_k=10,
+        max_sentences=1,
+    )
+
+    pipeline = create_pipeline(
+        config=config,
+    )
+
+    assert pipeline.config is config
+    assert pipeline.config.keyword_top_k == 10
+    assert pipeline.config.max_sentences == 1
+
+
+def test_pipeline_uses_configuration_for_keywords():
+    config = PipelineConfig(
+        keyword_top_k=2,
+        max_sentences=3,
+    )
+
+    pipeline = create_pipeline(
+        config=config,
+    )
+
+    result = pipeline.process(
+        query="Python FastAPI",
+        raw_input=(
+            "Python is a programming language. "
+            "FastAPI is a Python framework."
+        ),
+    )
+
+    assert result.keywords is not None
+
+
+def test_pipeline_uses_configuration_for_compression():
+    config = PipelineConfig(
+        keyword_top_k=5,
+        max_sentences=1,
+    )
+
+    pipeline = create_pipeline(
+        config=config,
+    )
+
+    result = pipeline.process(
+        query="Python",
+        raw_input=(
+            "Python is a programming language. "
+            "FastAPI is a Python framework. "
+            "Python is useful for backend systems."
+        ),
+    )
+
+    assert isinstance(
+        result,
+        PipelineResult,
+    )
+
+    assert result.compressed_context
+
+
+def test_pipeline_result_contains_metadata():
+    pipeline = create_pipeline()
+
+    result = pipeline.process(
+        query="Python",
+        raw_input=(
+            "Python is a programming language. "
+            "FastAPI is a Python framework."
+        ),
+    )
+
+    assert result.metadata.input_count == len(
+        result.relevance
+    )
+
+    assert result.metadata.sentence_count == len(
+        result.sentences
+    )
+
+    assert result.metadata.filtered_count == len(
+        result.filtered_results
+    )
+
+    assert result.metadata.ranked_count == len(
+        result.ranked_context
+    )
+
+
+def test_pipeline_rejects_invalid_configuration():
+    with pytest.raises(TypeError):
+        create_pipeline(
+            config="invalid"
+        )
