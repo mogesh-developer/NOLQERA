@@ -29,7 +29,8 @@ from nolqera.intelligence.semantic_search.engine import (
 from nolqera.intelligence.semantic_similarity.embeddings.base import (
     EmbeddingProvider,
 )
-
+from nolqera.intelligence.pipeline.config import PipelineConfig
+from nolqera.intelligence.pipeline.models import PipelineResult
 
 class FakeEmbeddingProvider(EmbeddingProvider):
     """
@@ -86,8 +87,10 @@ def create_pipeline():
         noise_remover=noise_remover,
         context_ranker=context_ranker,
         context_compressor=context_compressor,
-        keyword_top_k=5,
-        max_sentences=2,
+        config=PipelineConfig(
+            keyword_top_k=5,
+            max_sentences=2,
+        ),
     )
 
 

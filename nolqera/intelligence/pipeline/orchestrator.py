@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
-
 from nolqera.intelligence.entities.engine import EntityEngine
 from nolqera.intelligence.importance.engine import ImportanceEngine
 from nolqera.intelligence.intent.engine import IntentEngine
@@ -12,6 +9,7 @@ from nolqera.intelligence.semantic_search.models import (
     SemanticSearchResult,
 )
 
+from .config import PipelineConfig
 from .context_compressor import ContextCompressor
 from .context_ranker import ContextRankingAnalyzer
 from .entity_analyzer import EntityAnalyzer
@@ -19,76 +17,18 @@ from .importance_analyzer import ImportanceAnalyzer
 from .input_handler import InputHandler
 from .intent_analyzer import IntentAnalyzer
 from .keyword_analyzer import KeywordAnalyzer
+from .models import PipelineMetadata, PipelineResult
 from .noise_remover import NoiseRemover
 from .relevance_analyzer import RelevanceAnalyzer
 from .sentence_segmenter import SentenceSegmenter
-
-
-@dataclass(frozen=True)
-class PipelineResult:
-    """
-    Complete result produced by the NOLQERA core pipeline.
-    """
-
-    input_text: str
-    normalized_text: str
-    sentences: list[str]
-
-    relevance: list[dict]
-    importance: list[dict]
-
-    keywords: Any
-    entities: Any
-    intents: Any
-
-    filtered_results: list[SemanticSearchResult]
-    ranked_context: list
-
-    compressed_context: str
-
-    @property
-    def is_empty(self) -> bool:
-        """
-        Return True when the pipeline produced no
-        optimized context.
-        """
-        return not bool(self.compressed_context)
 
 
 class NOLQERAPipeline:
     """
     Core NOLQERA orchestration pipeline.
 
-    This class does not implement new intelligence.
-
-    It coordinates the existing Phase 1-4 intelligence
-    modules through the pipeline adapters.
-
-    Flow:
-
-        raw input
-            ↓
-        input handling
-            ↓
-        sentence segmentation
-            ↓
-        relevance analysis
-            ↓
-        noise removal
-            ↓
-        importance analysis
-            ↓
-        keyword analysis
-            ↓
-        entity analysis
-            ↓
-        intent analysis
-            ↓
-        context ranking
-            ↓
-        context compression
-            ↓
-        PipelineResult
+    Coordinates the existing Phase 1-4 intelligence
+    components into one unified processing flow.
     """
 
     def __init__(
@@ -101,10 +41,9 @@ class NOLQERAPipeline:
         noise_remover: NoiseRemover,
         context_ranker: ContextRankingAnalyzer,
         context_compressor: ContextCompressor,
+        config: PipelineConfig | None = None,
         input_handler: InputHandler | None = None,
         sentence_segmenter: SentenceSegmenter | None = None,
-        keyword_top_k: int = 5,
-        max_sentences: int = 3,
     ) -> None:
 
         if not isinstance(
@@ -178,6 +117,14 @@ class NOLQERAPipeline:
                 "a ContextCompressor"
             )
 
+        if config is None:
+            config = PipelineConfig()
+
+        if not isinstance(config, PipelineConfig):
+            raise TypeError(
+                "config must be a PipelineConfig"
+            )
+
         if input_handler is None:
             input_handler = InputHandler()
 
@@ -201,25 +148,7 @@ class NOLQERAPipeline:
                 "a SentenceSegmenter"
             )
 
-        if not isinstance(keyword_top_k, int):
-            raise TypeError(
-                "keyword_top_k must be an integer"
-            )
-
-        if keyword_top_k <= 0:
-            raise ValueError(
-                "keyword_top_k must be greater than zero"
-            )
-
-        if not isinstance(max_sentences, int):
-            raise TypeError(
-                "max_sentences must be an integer"
-            )
-
-        if max_sentences <= 0:
-            raise ValueError(
-                "max_sentences must be greater than zero"
-            )
+        self.config = config
 
         self.input_handler = input_handler
         self.sentence_segmenter = sentence_segmenter
@@ -248,9 +177,6 @@ class NOLQERAPipeline:
         self.context_ranker = context_ranker
         self.context_compressor = context_compressor
 
-        self.keyword_top_k = keyword_top_k
-        self.max_sentences = max_sentences
-
     def process(
         self,
         query: str,
@@ -258,14 +184,6 @@ class NOLQERAPipeline:
     ) -> PipelineResult:
         """
         Execute the complete NOLQERA pipeline.
-
-        Parameters
-        ----------
-        query:
-            User query used for relevance analysis.
-
-        raw_input:
-            Raw context/document text to process.
         """
 
         if not isinstance(query, str):
@@ -371,7 +289,7 @@ class NOLQERAPipeline:
 
         keywords = self.keyword_analyzer.analyze(
             normalized_text,
-            top_k=self.keyword_top_k,
+            top_k=self.config.keyword_top_k,
         )
 
         # ---------------------------------------------------------
@@ -406,12 +324,23 @@ class NOLQERAPipeline:
         compressed_context = (
             self.context_compressor.compress(
                 ranked_context,
-                max_sentences=self.max_sentences,
+                max_sentences=self.config.max_sentences,
             )
         )
 
         # ---------------------------------------------------------
-        # 11. Unified result
+        # 11. Pipeline metadata
+        # ---------------------------------------------------------
+
+        metadata = PipelineMetadata(
+            input_count=len(relevance_results),
+            sentence_count=len(sentences),
+            filtered_count=len(filtered_results),
+            ranked_count=len(ranked_context),
+        )
+
+        # ---------------------------------------------------------
+        # 12. Unified pipeline result
         # ---------------------------------------------------------
 
         return PipelineResult(
@@ -426,4 +355,5 @@ class NOLQERAPipeline:
             filtered_results=filtered_results,
             ranked_context=ranked_context,
             compressed_context=compressed_context,
+            metadata=metadata,
         )
