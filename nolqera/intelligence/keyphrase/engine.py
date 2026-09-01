@@ -276,3 +276,31 @@ class KeyphraseEngine:
                 start=1,
             )
         ]
+
+    def analyze(self, text: str, top_k: int = 5) -> dict:
+        """Analyze text to return both keywords and keyphrases."""
+        if not isinstance(text, str):
+            raise TypeError("text must be a string")
+        if not text.strip():
+            raise ValueError("text cannot be empty")
+        if not isinstance(top_k, int):
+            raise TypeError("top_k must be an integer")
+        if top_k <= 0:
+            raise ValueError("top_k must be positive")
+
+        keyword_engine = KeyphraseEngine(
+            min_n=1,
+            max_n=1,
+            tfidf_weight=self.scorer.tfidf_weight,
+            frequency_weight=self.scorer.frequency_weight,
+            length_weight=self.scorer.length_weight,
+        )
+        keywords_results = keyword_engine.extract(text, top_k=top_k)
+
+        # For keyphrases, we use the current engine's configuration
+        keyphrase_results = self.extract(text, top_k=top_k)
+
+        return {
+            "keywords": [res.phrase for res in keywords_results],
+            "keyphrases": [res.phrase for res in keyphrase_results],
+        }

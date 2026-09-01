@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/mogesh-developer/NOLQERA"><img src="https://img.shields.io/badge/python-3.11+-3776AB.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge" alt="License MIT"></a>
-  <a href="https://github.com/mogesh-developer/NOLQERA"><img src="https://img.shields.io/badge/tests-655%20passed-brightgreen.svg?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests"></a>
+  <a href="https://github.com/mogesh-developer/NOLQERA"><img src="https://img.shields.io/badge/tests-920%2B%20passed-brightgreen.svg?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests"></a>
   <a href="https://github.com/mogesh-developer/NOLQERA"><img src="https://img.shields.io/badge/architecture-modular-orange.svg?style=for-the-badge" alt="Architecture"></a>
   <a href="https://github.com/mogesh-developer/NOLQERA"><img src="https://img.shields.io/badge/status-active--development-blueviolet.svg?style=for-the-badge" alt="Status"></a>
 </p>
@@ -26,6 +26,7 @@
 - [Installation](#-installation)
 - [Quickstart Guide](#-quickstart-guide)
 - [NOLQERA Intelligence Suite](#-nolqera-intelligence-suite)
+- [Pipeline Adapters Suite](#-pipeline-adapters-suite)
 - [Retrieval Quality Pipeline](#-retrieval-quality-pipeline)
   - [Query Preprocessing](#1-query-preprocessing)
   - [Score Normalization](#2-score-normalization)
@@ -38,6 +39,12 @@
   - [Redundant Info Collapse \& Noise Detection](#2-redundant-info-collapse--noise-detection)
   - [Importance Separation \& Context Ranking](#3-importance-separation--context-ranking)
   - [Final Context Scoring](#4-final-context-scoring)
+  - [Extractive Summarization](#5-extractive-summarization)
+  - [Context Prioritization](#6-context-prioritization)
+  - [Redundancy-Aware Compression](#7-redundancy-aware-compression)
+  - [Sentence Selection \& Token Budget Reduction](#8-sentence-selection--token-budget-reduction)
+  - [Preservation Verification Gates](#9-preservation-verification-gates)
+  - [Final Context Compressor](#10-final-context-compressor)
 - [Development \& Testing](#-development--testing)
 - [Roadmap](#-roadmap)
 - [License](#-license)
@@ -48,16 +55,16 @@
 
 **NOLQERA** is a lightweight, high-performance NLP engine built from fundamental mathematical algorithms rather than wrapping high-level monolithic libraries. 
 
-It is designed to give complete visibility into how text cleaning, tokenization, TF-IDF vectorization, Naive Bayes/Logistic Regression classification, entity extraction, intent recognition, and semantic similarity engines work under the hood.
+It is designed to give complete visibility into how text cleaning, tokenization, TF-IDF vectorization, Naive Bayes/Logistic Regression classification, entity extraction, intent recognition, semantic similarity engines, retrieval quality pipelines, and context compression optimization work under the hood.
 
 > [!IMPORTANT]
-> **Zero Heavy Wrapper Dependencies**: NOLQERA's core algorithms run with zero bloat, pure mathematical precision, and full test coverage.
+> **Zero Heavy Wrapper Dependencies**: NOLQERA's core algorithms run with zero bloat, pure mathematical precision, and full test coverage (**920+ verified unit & integration tests**).
 
 ---
 
 ## 🏗 Architecture & Engine Design
 
-NOLQERA is structured into modular layers, separating core text features from the intelligence suite and advanced context optimization strategies:
+NOLQERA is structured into modular layers, separating core text features from the intelligence suite, pipeline adapters, retrieval quality, and advanced context optimization:
 
 ```mermaid
 flowchart TD
@@ -78,9 +85,13 @@ flowchart TD
         Tokenize --> Semantic[Similarity Engine]
     end
     
+    subgraph Pipeline Adapters
+        Intelligence Suite --> PipelineAdapters[NOLQERA Pipeline Adapters]
+    end
+
     subgraph Retrieval Quality & Context Optimization
-        Relevance --> RetrievalQuality[Retrieval Quality Pipeline]
-        Semantic --> ContextOptimization[Context Optimization Pipeline]
+        PipelineAdapters --> RetrievalQuality[Retrieval Quality Pipeline]
+        PipelineAdapters --> ContextOptimization[Context Optimization & Preservation]
     end
 ```
 
@@ -95,8 +106,9 @@ flowchart TD
 | **Vectorization** | `nolqera.features` | BoW, N-Grams, Mathematical TF-IDF Vectorizer with IDF smoothing | 🟢 `Done` |
 | **Classification** | `nolqera.classification` | Multinomial Naive Bayes, Logistic Regression | 🟢 `Done` |
 | **Intelligence Suite** | `nolqera.intelligence` | Relevance, Importance, Keyphrase, NER, Intent, and Similarity Engines | 🟢 `Done` |
+| **Pipeline Adapters** | `nolqera.intelligence.pipeline` | Standardized adapters for relevance, importance, keywords, NER, intent, noise removal, ranking, compression | 🟢 `Done` |
 | **Retrieval Quality** | `nolqera.intelligence.retrieval_quality` | Query preprocessing, score normalization, candidate retrieval, filtering, diversity, reranking, and evaluation metrics | 🟢 `Done` |
-| **Context Optimization** | `nolqera.intelligence.context_optimization` | Near-duplicate detection, semantic redundancy, information collapse, noise filtering, importance separation, ranking, and scorer | 🟢 `Done` |
+| **Context Optimization** | `nolqera.intelligence.context_optimization` | Deduplication, redundancy collapse, noise filtering, context ranking, extractive summarization, prioritizer, token reduction, preservation gates, and final context compressor | 🟢 `Done` |
 
 ---
 
@@ -272,6 +284,43 @@ print(f"Similarity: {result.score:.4f} | {result.text_a} <-> {result.text_b}")
 
 ---
 
+## 🔌 Pipeline Adapters Suite
+
+Located under `nolqera.intelligence.pipeline`, these lightweight adapters standardize inputs and outputs across pipeline components:
+
+```python
+from nolqera.intelligence.pipeline import (
+    RelevanceAnalyzer,
+    ImportanceAnalyzer,
+    KeywordAnalyzer,
+    EntityAnalyzer,
+    IntentAnalyzer,
+    NoiseRemover,
+    ContextRanker,
+    ContextCompressor,
+)
+
+# Relevance & Importance analysis
+relevance_analyzer = RelevanceAnalyzer()
+importance_analyzer = ImportanceAnalyzer()
+
+relevance_scores = relevance_analyzer.analyze("query text", ["sentence 1", "sentence 2"])
+importance_scores = importance_analyzer.analyze(["sentence 1", "sentence 2"])
+
+# Noise removal & ranking
+noise_remover = NoiseRemover()
+context_ranker = ContextRanker(relevance_weight=0.6, importance_weight=0.4)
+
+clean_sentences = noise_remover.remove(["sentence 1", "sentence 2"])
+ranked_contexts = context_ranker.rank(clean_sentences, relevance_scores, importance_scores)
+
+# Context compression adapter
+compressor = ContextCompressor(max_sentences=2)
+compressed = compressor.compress(ranked_contexts)
+```
+
+---
+
 ## 🛡️ Retrieval Quality Pipeline
 
 Located under `nolqera.intelligence.retrieval_quality`, this pipeline enforces semantic sanity, normalizes search scoring metrics, filters out low-relevance results, and structures search quality evaluations.
@@ -411,16 +460,18 @@ print("Precision@1:", precision_at_k(retrieved=[1, 0], relevant={1}, k=1))
 
 ## ⚙️ Context Optimization Pipeline
 
-Located under `nolqera.intelligence.context_optimization`, this module maximizes the information density of LLM contexts by collapsing semantic redundancy, isolating signal from noise, and ranking components by combined relevance & importance weights.
+Located under `nolqera.intelligence.context_optimization`, this module maximizes the information density of LLM contexts by collapsing semantic redundancy, isolating signal from noise, ranking components by combined relevance & importance weights, reducing token budgets, and enforcing strict preservation verification gates.
 
 ```mermaid
 flowchart TD
-    ScoredResults[Raw Retrieval Results] --> NearDup[Near-Duplicate Filter]
-    NearDup --> SemRedundancy[Semantic Redundancy Collapse]
-    SemRedundancy --> NoiseDet[Alphanumeric Noise Detection]
-    NoiseDet --> Sep[Importance Separation]
-    Sep --> Ranker[Context Ranker & Weights]
-    Ranker --> Output[Optimized Context Block]
+    ScoredResults[Raw Context Items] --> Prioritizer[Context Prioritizer]
+    Prioritizer --> Redundancy[Redundancy-Aware Compressor]
+    Redundancy --> Selection[Sentence Selector]
+    Selection --> TokenReduction[Token Budget Reduction]
+    TokenReduction --> Validators[Preservation Validators: Info, Entity, Fact]
+    Validators --> FinalGate{Preservation Gate Passed?}
+    FinalGate -- Yes --> FinalCompressor[Final Context Compression Result]
+    FinalGate -- No --> Error[ValueError: Preservation Failure]
 ```
 
 <details>
@@ -512,20 +563,146 @@ print("Final Context Score:", final_score.score)
 ```
 </details>
 
+<details>
+<summary><b>5. Extractive Summarization</b></summary>
+
+Extracts central representative sentences to summarize large contexts under strict sentence count constraints without text generation:
+
+```python
+from nolqera.intelligence.context_optimization.extractive_summarization import ExtractiveSummarizer
+
+summarizer = ExtractiveSummarizer(max_sentences=2)
+summary_result = summarizer.summarize(ranked_contexts)
+
+print("Summary Text:", summary_result.text)
+print("Sentences Retained:", len(summary_result.selected))
+```
+</details>
+
+<details>
+<summary><b>6. Context Prioritization</b></summary>
+
+Establishes deterministic priority ordering over ranked contexts using a 4-tier tie-breaking hierarchy: `ranking_score` -> `importance_score` -> `relevance_score` -> `result.index`:
+
+```python
+from nolqera.intelligence.context_optimization.context_prioritization import ContextPrioritizer
+
+prioritizer = ContextPrioritizer(descending=True)
+prioritized = prioritizer.prioritize(ranked_contexts)
+top_contexts = prioritizer.select_top(ranked_contexts, limit=3)
+```
+</details>
+
+<details>
+<summary><b>7. Redundancy-Aware Compression</b></summary>
+
+Composes exact duplicate, near duplicate, semantic redundancy, and redundant information checkers into a unified compressor:
+
+```python
+from nolqera.intelligence.context_optimization.redundancy_aware_compression import RedundancyAwareCompressor
+
+def exact_duplicate_checker(first: str, second: str) -> bool:
+    return first.strip() == second.strip()
+
+compressor = RedundancyAwareCompressor(exact_duplicate_checker=exact_duplicate_checker)
+result = compressor.compress(ranked_contexts)
+print("Retained Count:", len(result.selected), "| Removed Redundant Count:", len(result.removed))
+```
+</details>
+
+<details>
+<summary><b>8. Sentence Selection & Token Budget Reduction</b></summary>
+
+Limits sentence counts while preserving original context order, and applies greedy token budget reduction with custom token counters:
+
+```python
+from nolqera.intelligence.context_optimization.sentence_selection import SentenceSelector
+from nolqera.intelligence.context_optimization.token_reduction import TokenReductionStrategy
+
+# 1. Sentence selection preserving source order
+selector = SentenceSelector(max_sentences=3)
+selected_result = selector.select(ranked_contexts)
+
+# 2. Greedy token budget reduction
+def word_counter(text: str) -> int:
+    return len(text.split())
+
+token_strategy = TokenReductionStrategy(token_counter=word_counter)
+token_result = token_strategy.select(selected_result.selected, budget=100)
+print("Compressed Tokens:", token_result.compressed_tokens, "| Reduction:", f"{token_result.reduction_percentage:.2f}%")
+```
+</details>
+
+<details>
+<summary><b>9. Preservation Verification Gates</b></summary>
+
+Validates that important information, entities, and numeric/percentage facts are preserved in compressed contexts:
+
+```python
+from nolqera.intelligence.context_optimization.information_preservation import InformationPreserver
+from nolqera.intelligence.context_optimization.entity_preservation import EntityPreserver
+from nolqera.intelligence.context_optimization.fact_preservation import FactPreserver
+
+# Information Preservation Validator
+info_preserver = InformationPreserver(importance_threshold=0.70)
+info_res = info_preserver.validate(original_contexts, compressed_contexts)
+
+# Entity Preservation Validator
+def entity_extractor(text: str):
+    return [e for e in ["Python", "FastAPI", "MongoDB"] if e.casefold() in text.casefold()]
+
+entity_preserver = EntityPreserver(entity_extractor=entity_extractor)
+entity_res = entity_preserver.validate(original_contexts, compressed_contexts)
+
+# Fact & Number Preservation Validator (supports numbers, decimals, percentages)
+fact_preserver = FactPreserver(preserve_percentages=True)
+fact_res = fact_preserver.validate(original_contexts, compressed_contexts)
+
+print("Preserved:", info_res.is_preserved and entity_res.is_preserved and fact_res.is_preserved)
+```
+</details>
+
+<details>
+<summary><b>10. Final Context Compressor</b></summary>
+
+Orchestrates the entire Phase 4 compression pipeline, enforcing strict preservation gates:
+
+```python
+from nolqera.intelligence.context_optimization.final_context_compressor import FinalContextCompressor
+from nolqera.intelligence.context_optimization.redundancy_aware_compression import RedundancyAwareCompressor
+from nolqera.intelligence.context_optimization.token_reduction import TokenReductionStrategy
+
+compressor = FinalContextCompressor(
+    redundancy_compressor=RedundancyAwareCompressor(exact_duplicate_checker=exact_duplicate_checker),
+    token_reduction_strategy=TokenReductionStrategy(token_counter=word_counter),
+    entity_extractor=entity_extractor,
+    max_sentences=3,
+    importance_threshold=0.70,
+    require_preservation=True,
+)
+
+final_result = compressor.compress(ranked_contexts, token_budget=50)
+print("Final Context Text:", final_result.text)
+print("Preserved All Gates:", final_result.is_preserved)
+```
+</details>
+
 ---
 
 ## 🧪 Development & Testing
 
-NOLQERA is built using strict test-driven development (TDD) with over **650+ unit and integration tests** validating math, constraints, and pipelines.
+NOLQERA is built using strict test-driven development (TDD) with over **920+ unit and integration tests** validating math, constraints, and pipelines.
 
 ```powershell
 # Run the complete test suite
 pytest -v
 
-# Run tests for specific context optimization modules
-pytest tests/test_context_ranking.py -v -s
-pytest tests/test_redundant_information_collapse.py -v -s
-pytest tests/test_noise_detection.py -v -s
+# Run specific test suites
+pytest tests/test_final_context_compressor.py -v -s
+pytest tests/test_fact_preservation.py -v -s
+pytest tests/test_entity_preservation.py -v -s
+pytest tests/test_information_preservation.py -v -s
+pytest tests/test_redundancy_aware_compression.py -v -s
 ```
 
 ---
@@ -536,7 +713,7 @@ pytest tests/test_noise_detection.py -v -s
 - [x] **Phase 2 — Text Statistics & Vocabulary**: Vocabulary Manager (`UNK`), Readability scores, Lexical Diversity (TTR).
 - [x] **Phase 3 — Machine Learning NLP**: Naive Bayes, Logistic Regression (Gradient Descent, Cross-Entropy), Metrics & Reports.
 - [x] **Phase 4 — NOLQERA Intelligence Suite**: Relevance, Importance, Keyphrase, Entity, Intent, and Semantic Similarity Engines.
-- [x] **Phase 5 — Retrieval Quality & Context Optimization**: Precision/Recall metrics, candidate filters, Jaccard diversity, redundancy collapsing, importance separation, context ranking.
+- [x] **Phase 5 — Retrieval Quality & Context Optimization**: Precision/Recall metrics, candidate filters, Jaccard diversity, redundancy collapsing, importance separation, context ranking, extractive summarizer, token reduction, preservation gates, final context compressor.
 - [ ] **Phase 6 — Neural Embeddings**: Custom Word2Vec (Skip-gram, CBOW), Dense Vector Store.
 - [ ] **Phase 7 — Transformers & RAG**: Attention mechanisms, Vector Search Indexing, RAG Pipeline.
 

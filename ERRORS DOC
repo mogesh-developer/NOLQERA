@@ -467,3 +467,227 @@ E   ModuleNotFoundError: No module named 'nolqera.intelligence.semantic_search.f
 
 ### How to Avoid in Future
 * **Check Cross-package References**: When importing models or components between sibling packages (e.g. from `semantic_search` to `context_optimization`), avoid relative imports like `from .models` and use the full absolute path of the target package.
+
+---
+
+## 22. Strict Typechecking & Interface Alignment in Pipeline Adapters and Mocks
+### Error
+Running `pytest tests/test_relevance_analyzer.py`, `pytest tests/test_keyword_analyzer.py`, `pytest tests/test_importance_analyzer.py`, and `pytest tests/test_entity_analyzer.py` failed with several errors:
+* `TypeError: embedding_provider must implement EmbeddingProvider`
+* `TypeError: engine must be a KeyphraseEngine`
+* `TypeError: engine must be an ImportanceEngine`
+* `TypeError: entity_engine must be an EntityEngine`
+* `AttributeError: 'list' object has no attribute 'lower'` in `FakeEmbeddingProvider.embed`
+* `AttributeError: 'dict' object has no attribute 'sentence'` in `ImportanceAnalyzer.analyze`
+
+### Root Cause
+1. **Mock Inheritance**: The mock/fake classes (`FakeEmbeddingProvider`, `FakeKeyphraseEngine`, `FakeImportanceEngine`, `FakeEntityEngine`) used in the test suites did not inherit from their respective base classes (`EmbeddingProvider`, `KeyphraseEngine`, `ImportanceEngine`, `EntityEngine`), failing the strict `isinstance()` type checks implemented in the constructors of the engines and adapters.
+2. **Signature/Type Mismatches**:
+   * `SemanticSearchEngine.search` passes a token list (`list[str]`) to `EmbeddingProvider.embed` when using a non-Transformer provider, but `FakeEmbeddingProvider` assumed the argument would always be a string (`str`).
+   * `ImportanceAnalyzer` expected list of dataclasses (`ImportanceResult`) from the engine to extract `.sentence` and `.score`, but `FakeImportanceEngine` initially returned a list of `dict` objects.
+   * `KeywordAnalyzer` called `self.engine.analyze` but `KeyphraseEngine` only implemented `extract`.
+
+### How to Fix
+1. **Subclass Base Interfaces**: Make `FakeEmbeddingProvider` inherit from `EmbeddingProvider`, `FakeKeyphraseEngine` from `KeyphraseEngine`, `FakeImportanceEngine` from `ImportanceEngine`, and `FakeEntityEngine` from `EntityEngine`.
+2. **Standardize Input/Output Models**:
+   * Modify `FakeEmbeddingProvider.embed` to check and handle both `list` and `str` types.
+   * Modify `FakeImportanceEngine.analyze` to construct and return instances of the `ImportanceResult` dataclass.
+   * Map the `ImportanceResult` objects back to `list[dict]` in `ImportanceAnalyzer.analyze` preserving input order.
+   * Implement `analyze(self, text, top_k)` in `KeyphraseEngine` to expose the keyword/keyphrase extraction dictionary to `KeywordAnalyzer` in both tests and production.
+
+### How to Avoid in Future
+* **Mock Real Interfaces**: Always subclass real interfaces when writing custom test mocks/fakes to bypass strict `isinstance()` checks.
+* **Define Data Containers**: Use the shared model/dataclass files (e.g. `models.py`) to pass data between components rather than raw dictionaries, and handle type casting inside adapters.
+
+---
+
+## 23. Mismatched Grouped Score Expectations in Intent Analyzer Tests
+### Error
+Running `pytest tests/test_intent_analyzer.py` failed with:
+`AssertionError: assert 1 == 2` at `test_intent_analyzer_returns_exact_intent_result`.
+
+### Root Cause
+The test asserted that analyzing the query `"What is Python?"` would yield two separate `IntentResult` objects (one with score 1.0, and one with score 0.9). However, `IntentEngine` automatically groups classifications by intent (both signals mapped to `"question"`) and combines their independent scores via:
+`combined_score = 1.0 - (1.0 - score_1) * (1.0 - score_2) = 1.0 - 0.0 * 0.1 = 1.0`
+This results in a single, grouped `IntentResult` with `score=1.0` and `evidence_count=2`.
+
+### How to Fix
+Update the test assertions in [test_intent_analyzer.py](file:///d:/nolqera/tests/test_intent_analyzer.py) to expect `len(result) == 1` and a single result with `evidence_count == 2` and `score == 1.0`.
+
+### How to Avoid in Future
+* **Align Expectations with Engine Logic**: When testing high-level pipelines/adapters, verify the scoring, grouping, or aggregation properties of the underlying engine to ensure assertions align with actual business logic.
+
+---
+
+## 24. Pytest Discovered Zero Items Due to Empty Test File
+### Error
+Running `pytest tests/test_noise_remover.py` completed with:
+`collected 0 items / no tests ran`.
+
+### Root Cause
+The test file [test_noise_remover.py](file:///d:/nolqera/tests/test_noise_remover.py) was created/modified as an empty (0 bytes) file, which caused Pytest to successfully discover the file but find no runnable test functions.
+
+### How to Fix
+Populate the file [test_noise_remover.py](file:///d:/nolqera/tests/test_noise_remover.py) with the complete set of unit test declarations, ensuring proper imports of `NoiseRemover`, `NoiseDetector`, and `SemanticSearchResult`.
+
+### How to Avoid in Future
+* **Verify File Write Operations**: Ensure file edits or creations write the contents successfully and do not leave files empty.
+* **Double-Check Test Collection**: If Pytest reports that 0 tests were collected, inspect the file sizes and contents in the repository workspace.
+
+---
+
+## 25. Incorrect Sorted Order Expectation in Context Ranker Tests
+### Error
+Running `pytest tests/test_context_ranker.py` failed with:
+`AssertionError: assert 'Highly important' == 'Highly relevant'` at `test_rank_uses_importance_with_relevance`.
+
+### Root Cause
+The test asserted that the returned ranked contexts would place `"Highly relevant"` at index 0 and `"Highly important"` at index 1.
+However, `ContextRanker` combines relevance and importance scores using their weights (each `0.5` in this case):
+* `"Highly relevant"` (relevance = 0.9, importance = 0.5): `0.9 * 0.5 + 0.5 * 0.5 = 0.70`
+* `"Highly important"` (relevance = 0.7, importance = 1.0): `0.7 * 0.5 + 1.0 * 0.5 = 0.85`
+Since `ContextRanker` ranks contexts in descending order of their combined ranking scores, `"Highly important"` (0.85) should be ranked first (index 0) and `"Highly relevant"` (0.70) second (index 1). The test assertion expected the incorrect reverse order.
+
+### How to Fix
+Correct the test assertions in [test_context_ranker.py](file:///d:/nolqera/tests/test_context_ranker.py) to expect `"Highly important"` at rank index 0 (with score 0.85) and `"Highly relevant"` at rank index 1 (with score 0.70).
+
+### How to Avoid in Future
+* **Calculate Scoring Manually during Test Design**: Manually calculate the exact weighted score output for all mock objects to ensure ranking order assertions align with descending sorting requirements.
+
+---
+
+## 26. Pytest Discovered Zero Items Due to Empty Context Compressor Test File
+### Error
+Running `pytest tests/test_context_compressor.py` completed with:
+`collected 0 items / no tests ran`.
+
+### Root Cause
+Similar to the noise remover test file, the test file [test_context_compressor.py](file:///d:/nolqera/tests/test_context_compressor.py) was created as an empty (0 bytes) file, preventing Pytest from discovering and running the unit test cases.
+
+### How to Fix
+Populate the file [test_context_compressor.py](file:///d:/nolqera/tests/test_context_compressor.py) with the complete set of unit test declarations, ensuring proper imports of `ContextCompressor`, `ContextRanker`, `RankedContext`, and `SemanticSearchResult`.
+
+### How to Avoid in Future
+* **Check File Sizes on Creation**: Verify that the workspace files are populated with the correct contents and are not zero-sized before attempting test collection.
+
+---
+
+## 27. Failed ValueError Check in RedundancyAwareCompressor (test_requires_at_least_one_checker)
+### Error
+Running `pytest tests/test_redundancy_aware_compression.py` failed with:
+```
+_____________________ test_requires_at_least_one_checker ______________________
+
+    def test_requires_at_least_one_checker():
+        compressor = RedundancyAwareCompressor()
+        sentence = make_ranked_context(...)
+
+>       with pytest.raises(ValueError):
+E       Failed: DID NOT RAISE ValueError
+
+tests\test_redundancy_aware_compression.py:109: Failed
+```
+
+### Root Cause
+In `RedundancyAwareCompressor`, the configuration check `if not configured: raise ValueError("at least one redundancy checker is required")` was placed inside `_is_redundant()`.
+During `compress()`, sentences were compared against previously `selected` representative contexts:
+```python
+for candidate in candidates:
+    for retained in selected:
+        if self._is_redundant(...):
+            ...
+```
+When `compress()` was invoked, `selected` was initially empty (`[]`). Because the inner loop over `selected` did not execute on the first sentence, `_is_redundant()` was never invoked, completely bypassing the `ValueError` configuration check.
+
+### How to Fix
+Perform the checker configuration validation at the entry of the `compress()` method before sentence iteration begins ([redundancy_aware_compression.py](file:///d:/nolqera/nolqera/intelligence/context_optimization/redundancy_aware_compression.py)):
+```python
+checkers = [
+    self.exact_duplicate_checker,
+    self.near_duplicate_checker,
+    self.semantic_redundancy_checker,
+    self.redundant_information_checker,
+]
+
+if not any(checkers):
+    raise ValueError(
+        "at least one redundancy checker "
+        "is required"
+    )
+```
+
+### How to Avoid in Future
+* **Validate Component Prerequisites Early**: Validate configuration requirements and prerequisites at the public method entry point (`compress()`) or constructor rather than inside nested loops or private helper functions.
+* **Avoid Deferring State Checks to Iteration Loops**: Do not defer validation logic to inner loops that depend on populated collections (like `selected`) which may be empty during initial execution steps.
+
+---
+
+## 28. Regex Lookahead Conflict with Sentence-Ending Punctuation in FactPreserver
+### Error
+Running `pytest tests/test_fact_preservation.py` failed with 4 assertion failures:
+* `test_identifies_numbers_exactly`: `AssertionError: assert ['3.11', '48.46'] == ['3.11', '48.46', '2026']`
+* `test_zero_is_preserved`: `AssertionError: assert ['0'] == ['0%']`
+
+### Root Cause
+In `FactPreserver`, `NUMBER_PATTERN` was compiled as:
+```python
+r"(?<![\w.])"
+r"\d+(?:\.\d+)?"
+r"%?"
+r"(?![\w.])"
+```
+The trailing lookahead `(?![\w.])` rejected any match followed by a word character OR dot (`.`).
+1. When a number appeared at the end of a sentence (e.g. `"tested in 2026."`), the sentence-ending period `.` triggered `(?![\w.])`, causing `2026` to be omitted.
+2. When a percentage appeared at the end of a sentence (e.g. `"reduced to 0%."`), matching `0%` was blocked by the period `.`. Regex backtracked and matched `0` without `%` because `%` was not in `[\w.]`.
+
+### How to Fix
+Update the lookahead in `NUMBER_PATTERN` to `(?!\w|(?:\.\d))` ([fact_preservation.py](file:///d:/nolqera/nolqera/intelligence/context_optimization/fact_preservation.py)), preventing sentence-ending periods from blocking numeric/percentage matches:
+```python
+NUMBER_PATTERN = re.compile(
+    r"(?<![\w.])"
+    r"\d+(?:\.\d+)?"
+    r"%?"
+    r"(?!\w|(?:\.\d))"
+)
+```
+
+### How to Avoid in Future
+* **Account for Sentence Punctuation in Token Regex**: Avoid overly broad negative lookaheads like `(?![\w.])` when extracting numeric tokens that may precede sentence-ending punctuation (`.`, `,`, `!`, `?`).
+* **Distinguish Structural Symbols from Punctuation**: Differentiate decimal points followed by digits (`\.\d`) from sentence-ending periods followed by whitespace or end of string.
+
+---
+
+## 29. Preservation Validation Against Raw Original Context Failing Redundancy Deduplication
+### Error
+Running `pytest tests/test_final_context_compressor.py` failed with:
+`ValueError: final context failed preservation: important information` in `test_exact_duplicate_is_removed`.
+
+### Root Cause
+In `FinalContextCompressor`, preservation validators were passed raw `original` contexts:
+```python
+information_result = self.information_preserver.validate(original, final_selected)
+```
+When `original` contained redundant duplicate sentences (e.g. two identical sentences with importance score >= 0.70), `RedundancyAwareCompressor` removed the duplicate, leaving a single representative sentence in `final_selected`.
+`InformationPreserver.validate(original, final_selected)` checked candidate sentence indices against `original`. Because the index of the removed duplicate was absent from `final_selected`, `InformationPreserver` marked it as "missing important information", triggering a false-positive `ValueError` when `require_preservation=True`.
+
+### How to Fix
+1. In `FinalContextCompressor.compress` ([final_context_compressor.py](file:///d:/nolqera/nolqera/intelligence/context_optimization/final_context_compressor.py)), pass `redundancy_selected` (the deduplicated candidate set) to the preservation validators:
+```python
+information_result = self.information_preserver.validate(
+    redundancy_selected,
+    final_selected,
+)
+entity_result = self.entity_preserver.validate(
+    redundancy_selected,
+    final_selected,
+)
+fact_result = self.fact_preserver.validate(
+    redundancy_selected,
+    final_selected,
+)
+```
+2. Update the `build_compressor` helper in [test_final_context_compressor.py](file:///d:/nolqera/tests/test_final_context_compressor.py) to set `require_preservation=False` by default, allowing token budget and sentence limit truncation tests to run cleanly while preservation gate tests explicitly specify `require_preservation=True`.
+
+### How to Avoid in Future
+* **Validate Preservation Against Deduplicated Baseline**: When verifying that downstream stages (like token budgeting or sentence selection) preserve critical content, compare against the deduplicated candidate set (`redundancy_selected`) rather than raw input containing duplicate entries.
+* **Align Test Helper Defaults**: Ensure test helpers set default configuration flags (such as `require_preservation`) appropriate for general pipeline unit testing, reserving explicit flag overrides for boundary/gate testing.
