@@ -714,3 +714,139 @@ And export `PipelineResult` and `PipelineMetadata` in [pipeline/\_\_init\_\_.py]
 ### How to Avoid in Future
 * **Double Check File Prefixes & Names**: Verify that module filenames match their intended import package paths upon creation.
 * **Immediate Test Discovery Verification**: Run `pytest` immediately after file creation to catch missing module typos during test collection before writing unit test assertions.
+
+---
+
+## 31. Pytest Test Collection Import File Mismatch Error
+### Error
+Running `pytest` across the repository failed during test collection with:
+```
+___________________ ERROR collecting tests/test_metrics.py ___________________ 
+import file mismatch:
+imported module 'test_metrics' has this __file__ attribute:
+  D:\nolqera\tests\evaluation\test_metrics.py
+which is not the same as the test file we want to collect:
+  D:\nolqera\tests\test_metrics.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+___________________ ERROR collecting tests/test_report.py ____________________ 
+import file mismatch:
+imported module 'test_report' has this __file__ attribute:
+  D:\nolqera\tests\evaluation\test_report.py
+which is not the same as the test file we want to collect:
+  D:\nolqera\tests\test_report.py
+```
+
+### Root Cause
+Pytest by default imports test files using their base module name (e.g., `test_metrics`). When `tests/` or subdirectories like `tests/evaluation/` lack `__init__.py` package marker files, Pytest imports them as top-level modules without package namespacing. When multiple test files share the same filename across different folders (e.g., `tests/test_metrics.py` and `tests/evaluation/test_metrics.py`), the second file collides with `sys.modules['test_metrics']`, triggering an import file mismatch error.
+
+### How to Fix
+Add `__init__.py` files to the root `tests/` directory and all test subdirectories (such as `tests/evaluation/`):
+1. Create [tests/\_\_init\_\_.py](file:///d:/nolqera/tests/__init__.py):
+   ```python
+   """Test suite package for nolqera."""
+   ```
+2. Create [tests/evaluation/\_\_init\_\_.py](file:///d:/nolqera/tests/evaluation/__init__.py):
+   ```python
+   """Evaluation test package for nolqera."""
+   ```
+
+### How to Avoid in Future
+* **Maintain Test Package Hierarchy**: Always create `__init__.py` files in test directories and subdirectories to ensure Pytest imports tests as qualified package modules (e.g., `tests.test_metrics` vs `tests.evaluation.test_metrics`).
+* **Unique Test File Basenames**: Where appropriate, use distinct, context-descriptive filenames for test files across packages.
+
+---
+
+## 32. Unpassed PipelineConfig Parameter Defaulting to Low Sentence Limits
+### Error
+Executing evaluation scripts like `real_world_retention_test.py` produced unexpectedly high context truncation (retaining only 3 sentences) and low information retention (e.g., 44.44% concept coverage), despite expecting a larger context budget.
+
+### Root Cause
+In `build_nolqera_pipeline()`, `create_default_configured_pipeline()` was called without explicitly supplying the `config` parameter. As a result, the factory fell back to the default `PipelineConfig()`, which defaults `max_sentences` to `3`.
+
+### How to Fix
+Import `PipelineConfig` and explicitly pass the configured instance into `create_default_configured_pipeline()`:
+```python
+from nolqera import (
+    NOLQERAPipeline,
+    PipelineConfig,
+    run_pipeline,
+    create_default_configured_pipeline,
+)
+
+return create_default_configured_pipeline(
+    semantic_search_engine=semantic_search_engine,
+    importance_engine=ImportanceEngine(),
+    keyphrase_engine=KeyphraseEngine(),
+    entity_engine=EntityEngine(),
+    intent_engine=IntentEngine(),
+    noise_remover=NoiseRemover(NoiseDetector()),
+    context_ranker=ContextRankingAnalyzer(ContextRanker()),
+    context_compressor=ContextCompressor(),
+    config=PipelineConfig(max_sentences=8),
+)
+```
+
+### How to Avoid in Future
+* **Explicit Configuration Pass**: Always explicitly pass a `PipelineConfig` instance when constructing pipelines via `create_default_configured_pipeline()`.
+* **Audit Default Constraints**: Review factory defaults (`max_sentences`, `keyword_top_k`) when designing real-world demos or benchmarks to ensure sentence allocation aligns with test requirements.
+
+---
+
+## 33. GLM Flash API Request Read Timeout (TimeoutError)
+### Error
+Executing `python examples/real_world_glm_retention_test.py` failed with:
+```
+TimeoutError: The read operation timed out
+```
+Traceback originating from `urllib.request.urlopen`:
+```
+  File "D:\nolqera\examples\real_world_glm_retention_test.py", line 171, in call_glm
+    with urlopen(request, timeout=120) as response:
+  File "Lib\http\client.py", line 286, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+  File "Lib\ssl.py", line 1166, in read
+    return self._sslobj.read(len, buffer)
+TimeoutError: The read operation timed out
+```
+
+### Root Cause
+Remote API requests to `open.bigmodel.cn` (GLM Flash) can occasionally experience network jitter, queue latency, or socket read timeouts when retrieving large completion outputs, causing unhandled single-attempt HTTP connections to time out and crash the retention test script.
+
+### How to Fix
+1. Increase HTTP `timeout` parameter (e.g. from 120s to 180s) in `urlopen()`.
+2. Wrap the API call in a robust retry loop with exponential backoff (e.g., up to 3 retries for `TimeoutError`, `URLError`, and transient 5xx / 429 HTTP status codes).
+
+```python
+    start = time.perf_counter()
+    max_retries = 3
+    data = {}
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            with urlopen(request, timeout=180) as response:
+                data = json.loads(
+                    response.read().decode("utf-8")
+                )
+            break
+        except (TimeoutError, URLError) as exc:
+            if attempt == max_retries:
+                raise RuntimeError(
+                    f"GLM Flash API request timed out after {max_retries} attempts: {exc}"
+                ) from exc
+            time.sleep(2 * attempt)
+        except HTTPError as exc:
+            error_body = exc.read().decode("utf-8", errors="replace")
+            if exc.code in (429, 502, 503, 504) and attempt < max_retries:
+                time.sleep(2 * attempt)
+                continue
+            raise RuntimeError(
+                f"GLM HTTP error: {exc.code} {exc.reason}\n"
+                f"{error_body}"
+            ) from exc
+```
+
+### How to Avoid in Future
+* **Implement Resilient Network Retry Logic**: Always wrap external cloud LLM API calls with retry logic and exponential backoff to handle transient network timeouts or rate limits gracefully.
+
+
+

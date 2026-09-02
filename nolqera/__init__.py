@@ -18,6 +18,19 @@ from .tokenization import Tokenizer
 from .utils import train_test_split
 from .document import Document, Sentence
 
+from nolqera.intelligence.pipeline import (
+    NOLQERAPipeline,
+    PipelineConfig,
+    PipelineMetadata,
+    PipelineResult,
+    NOLQERAPipelineError,
+    PipelineConfigurationError,
+    PipelineExecutionError,
+    PipelineStageError,
+    run_pipeline,
+    create_default_configured_pipeline,
+)
+
 
 __all__ = [
     "BagOfWords",
@@ -36,4 +49,14 @@ __all__ = [
     "train_test_split",
     "Document",
     "Sentence",
+    "NOLQERAPipeline",
+    "PipelineConfig",
+    "PipelineMetadata",
+    "PipelineResult",
+    "NOLQERAPipelineError",
+    "PipelineConfigurationError",
+    "PipelineExecutionError",
+    "PipelineStageError",
+    "run_pipeline",
+    "create_default_configured_pipeline",
 ]
