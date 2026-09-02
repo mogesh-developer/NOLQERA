@@ -50,9 +50,9 @@ class FactPreserver:
     # Avoids matching ordinary standalone punctuation.
     NUMBER_PATTERN = re.compile(
         r"(?<![\w.])"
-        r"\d+(?:\.\d+)?"
+        r"\d+(?:\.\d+)*"
         r"%?"
-        r"(?!\w|(?:\.\d))"
+        r"(?!\w)"
     )
 
     def __init__(
@@ -94,6 +94,21 @@ class FactPreserver:
 
         return values
 
+    @staticmethod
+    def _fact_sort_key(value: str):
+        numeric_value = value.rstrip("%")
+
+        try:
+            return (
+                0,
+                tuple(
+                    int(part)
+                    for part in numeric_value.split(".")
+                ),
+            )
+        except ValueError:
+            return (1, value)
+
     def identify_required_facts(
         self,
         original: Sequence[RankedContext],
@@ -125,13 +140,7 @@ class FactPreserver:
 
         return sorted(
             facts,
-            key=lambda value: (
-                float(value.rstrip("%"))
-                if value.rstrip("%").replace(
-                    ".", "", 1
-                ).isdigit()
-                else value
-            ),
+            key=self._fact_sort_key,
         )
 
     def validate(

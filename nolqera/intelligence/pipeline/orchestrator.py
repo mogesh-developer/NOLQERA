@@ -321,12 +321,17 @@ class NOLQERAPipeline:
         # 10. Context compression
         # ---------------------------------------------------------
 
-        compressed_context = (
-            self.context_compressor.compress(
-                ranked_context,
-                max_sentences=self.config.max_sentences,
+        if self.config.compression_strategy == "adaptive":
+            # Select top max_sentences context dynamically while preserving rank
+            selected = ranked_context[:self.config.max_sentences]
+            compressed_context = " ".join(item.result.text for item in selected)
+        else:
+            compressed_context = (
+                self.context_compressor.compress(
+                    ranked_context,
+                    max_sentences=self.config.max_sentences,
+                )
             )
-        )
 
         # ---------------------------------------------------------
         # 11. Pipeline metadata

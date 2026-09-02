@@ -85,3 +85,54 @@ def test_configuration_can_be_used_as_value_object():
     )
 
     assert config_a == config_b
+
+
+def test_serialization_to_and_from_dict():
+    config = PipelineConfig(
+        keyword_top_k=8,
+        max_sentences=6,
+        compression_strategy="adaptive",
+    )
+
+    data = config.to_dict()
+    assert data == {
+        "keyword_top_k": 8,
+        "max_sentences": 6,
+        "compression_strategy": "adaptive",
+    }
+
+    reconstructed = PipelineConfig.from_dict(data)
+    assert reconstructed == config
+
+
+def test_serialization_to_and_from_json():
+    config = PipelineConfig(
+        keyword_top_k=10,
+        max_sentences=5,
+        compression_strategy="standard",
+    )
+
+    json_str = config.to_json()
+    reconstructed = PipelineConfig.from_json(json_str)
+    assert reconstructed == config
+
+
+def test_from_dict_validation():
+    with pytest.raises(TypeError):
+        PipelineConfig.from_dict("invalid")
+
+
+def test_from_json_validation():
+    with pytest.raises(TypeError):
+        PipelineConfig.from_json(123)
+
+    with pytest.raises(ValueError):
+        PipelineConfig.from_json("invalid json")
+
+
+def test_compression_strategy_validation():
+    with pytest.raises(TypeError):
+        PipelineConfig(compression_strategy=123)
+
+    with pytest.raises(ValueError):
+        PipelineConfig(compression_strategy="unknown")

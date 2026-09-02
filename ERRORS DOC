@@ -792,61 +792,222 @@ return create_default_configured_pipeline(
 
 ---
 
-## 33. GLM Flash API Request Read Timeout (TimeoutError)
+## 33. Multi-Dot Version Support and Tuple Numeric Sorting in FactPreserver
 ### Error
-Executing `python examples/real_world_glm_retention_test.py` failed with:
-```
-TimeoutError: The read operation timed out
-```
-Traceback originating from `urllib.request.urlopen`:
-```
-  File "D:\nolqera\examples\real_world_glm_retention_test.py", line 171, in call_glm
-    with urlopen(request, timeout=120) as response:
-  File "Lib\http\client.py", line 286, in _read_status
-    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
-  File "Lib\ssl.py", line 1166, in read
-    return self._sslobj.read(len, buffer)
-TimeoutError: The read operation timed out
-```
+Numbers with multiple dots like version strings (`3.11.9`) were matched partially (e.g. `3.11`), and sorting facts with floats failed or ordered version strings incorrectly.
 
 ### Root Cause
-Remote API requests to `open.bigmodel.cn` (GLM Flash) can occasionally experience network jitter, queue latency, or socket read timeouts when retrieving large completion outputs, causing unhandled single-attempt HTTP connections to time out and crash the retention test script.
+1. In `FactPreserver`, `NUMBER_PATTERN` was `r"\d+(?:\.\d+)?"` which only permitted a single dot for simple floats.
+2. In `identify_required_facts()`, the sort key attempted `float(value.rstrip("%"))` which threw `ValueError` on version strings like `3.11.9`.
 
 ### How to Fix
-1. Increase HTTP `timeout` parameter (e.g. from 120s to 180s) in `urlopen()`.
-2. Wrap the API call in a robust retry loop with exponential backoff (e.g., up to 3 retries for `TimeoutError`, `URLError`, and transient 5xx / 429 HTTP status codes).
+1. Update `NUMBER_PATTERN` in [fact_preservation.py](file:///d:/nolqera/nolqera/intelligence/context_optimization/fact_preservation.py) to support zero or more dot-separated numeric segments:
+   ```python
+   NUMBER_PATTERN = re.compile(
+       r"(?<![\w.])"
+       r"\d+(?:\.\d+)*"
+       r"%?"
+       r"(?!\w)"
+   )
+   ```
+2. Add `@staticmethod` `_fact_sort_key` in `FactPreserver` to split dots into integer tuples:
+   ```python
+   @staticmethod
+   def _fact_sort_key(value: str):
+       numeric_value = value.rstrip("%")
 
+       try:
+           return (
+               0,
+               tuple(
+                   int(part)
+                   for part in numeric_value.split(".")
+               ),
+           )
+       except ValueError:
+           return (1, value)
+   ```
+
+### How to Avoid in Future
+* **Support Version Identifiers in Fact Extractor**: Use repeated group matching `(?:\.\d+)*` to extract version strings as single unified tokens instead of floating point numbers.
+* **Tuple-Based Numeric Sorting**: When sorting multi-part numeric strings (like `3.11.9`), split on `.` and map to integer tuples instead of attempting standard `float()` conversion.
+
+---
+
+## 34. TypeError: EntityPreserver Missing Required Positional Argument entity_extractor
+### Error
+Instantiating `EntityPreserver()` in unit tests threw:
+`TypeError: EntityPreserver.__init__() missing 1 required positional argument: 'entity_extractor'`
+
+### Root Cause
+`EntityPreserver` does not perform internal entity extraction; it delegates extraction to an external callable/analyzer passed via `entity_extractor` in `__init__`. Instantiating `EntityPreserver()` without arguments in new unit test suites causes Python constructor type check failures.
+
+### How to Fix
+In test suites (e.g., [test_detailed_entity_retention.py](file:///d:/nolqera/tests/test_detailed_entity_retention.py)), define a mock or sample entity extractor function and pass it into `EntityPreserver`:
 ```python
-    start = time.perf_counter()
-    max_retries = 3
-    data = {}
+def sample_entity_extractor(text: str):
+    known_entities = {
+        "NOLQERA",
+        "Python",
+        "FastAPI",
+        "PyTorch",
+        "TensorFlow",
+    }
+    return [
+        entity
+        for entity in known_entities
+        if entity.casefold() in text.casefold()
+    ]
 
-    for attempt in range(1, max_retries + 1):
-        try:
-            with urlopen(request, timeout=180) as response:
-                data = json.loads(
-                    response.read().decode("utf-8")
-                )
-            break
-        except (TimeoutError, URLError) as exc:
-            if attempt == max_retries:
-                raise RuntimeError(
-                    f"GLM Flash API request timed out after {max_retries} attempts: {exc}"
-                ) from exc
-            time.sleep(2 * attempt)
-        except HTTPError as exc:
-            error_body = exc.read().decode("utf-8", errors="replace")
-            if exc.code in (429, 502, 503, 504) and attempt < max_retries:
-                time.sleep(2 * attempt)
-                continue
-            raise RuntimeError(
-                f"GLM HTTP error: {exc.code} {exc.reason}\n"
-                f"{error_body}"
-            ) from exc
+preserver = EntityPreserver(sample_entity_extractor)
 ```
 
 ### How to Avoid in Future
-* **Implement Resilient Network Retry Logic**: Always wrap external cloud LLM API calls with retry logic and exponential backoff to handle transient network timeouts or rate limits gracefully.
+* **Supply Dependency Callables in Test Setup**: Always check constructor signatures for required dependency injections (such as `entity_extractor`) when instantiating component preservers in test functions.
+* **Centralize Test Extractors**: Use reusable mock extractor functions or pytest fixtures across test modules.
+
+---
+
+## 35. Missing Constructor Injection in FinalContextCompressor Helper Functions
+### Error
+Instantiating `FinalContextCompressor` in test helper functions like `build_compressor()` threw:
+1. `TypeError: TokenReductionStrategy.__init__() missing 1 required positional argument: 'token_counter'`
+2. `ValueError: at least one redundancy checker is required` in `RedundancyAwareCompressor`
+3. `AttributeError: 'InformationPreservationResult' object has no attribute 'preserved_count'`
+
+### Root Cause
+1. `TokenReductionStrategy` requires a `token_counter` callable in its `__init__`.
+2. `RedundancyAwareCompressor` requires at least one active redundancy checker function (such as `exact_duplicate_checker`).
+3. `InformationPreservationResult` dataclass exposes the preserved list field as `preserved: List[RankedContext]`, not `preserved_count`.
+
+### How to Fix
+1. In test `build_compressor()` helper functions (e.g. in [test_compression_safety_boundary.py](file:///d:/nolqera/tests/test_compression_safety_boundary.py) and [test_multi_level_compression.py](file:///d:/nolqera/tests/test_multi_level_compression.py)), pass required arguments:
+   ```python
+   redundancy_compressor=RedundancyAwareCompressor(
+       exact_duplicate_checker=lambda cand, ret: cand.strip().casefold() == ret.strip().casefold()
+   ),
+   token_reduction_strategy=TokenReductionStrategy(
+       token_counter=lambda text: len(text.split()),
+   ),
+   ```
+2. Update count checks on `InformationPreservationResult` to use `len(result.information_preservation.preserved)`.
+
+### How to Avoid in Future
+* **Verify Dependency Injections in Test Helpers**: When constructing orchestrator components in test helpers, instantiate child strategies (`TokenReductionStrategy`, `RedundancyAwareCompressor`) with valid token counter callables and redundancy checkers.
+* **Check Dataclass Field Names**: Inspect target result dataclasses (`InformationPreservationResult`) to access collection fields (like `preserved`) via `len()` instead of assuming count fields exist.
+
+---
+
+## 36. Non-existent Method check_preservation and Plain String Signature Mismatches
+### Error
+Executing `pytest tests/test_failure_analysis.py` failed with:
+1. `AttributeError: 'FactPreserver' object has no attribute 'check_preservation'`
+2. `TypeError: EntityPreserver.__init__() missing 1 required positional argument: 'entity_extractor'`
+
+### Root Cause
+1. `FactPreserver` and `EntityPreserver` expose `validate(original, compressed)`, not `check_preservation()`.
+2. Both `FactPreserver.validate()` and `EntityPreserver.validate()` expect `Sequence[RankedContext]` objects, not plain Python `str` instances.
+3. `EntityPreserver` requires an `entity_extractor` callable argument in `__init__`.
+
+### How to Fix
+In [test_failure_analysis.py](file:///d:/nolqera/tests/test_failure_analysis.py):
+1. Wrap input text strings into `RankedContext` objects via a `make_ranked_context()` helper function.
+2. Supply a `sample_entity_extractor` function when initializing `EntityPreserver`.
+3. Call `preserver.validate(original, compressed)` instead of `preserver.check_preservation()`.
+
+### How to Avoid in Future
+* **Match Method Names & Signatures**: Inspect component class definitions (`FactPreserver`, `EntityPreserver`) before invoking methods in new test scripts to ensure method names (`validate`) and argument types (`Sequence[RankedContext]`) match exact API contracts.
+
+---
+
+## 37. Low LLM Fact and Entity Retention Coverage Due to Default max_sentences Truncation
+### Error
+Running `pytest tests/test_real_llm_retention.py` failed with assertion errors:
+1. `AssertionError: assert 40.0 >= 60.0` in `test_nolqera_answer_preserves_detailed_facts`
+2. `AssertionError: assert 33.33333333333333 >= 55.0` in `test_nolqera_answer_preserves_entities`
+
+### Root Cause
+In `test_real_llm_retention.py`, `create_default_configured_pipeline()` was called without providing a custom `PipelineConfig`. The pipeline defaulted `max_sentences` to `3`. As a result, only 3 sentences out of 11 from `RAW_CONTEXT` were passed to the LLM, truncating key factual details (such as supported OS platforms and libraries like Django, NumPy, PyTorch, TensorFlow) and leading to low fact/entity coverage scores.
+
+### How to Fix
+1. Import `PipelineConfig` and pass `config=PipelineConfig(max_sentences=10)` to `create_default_configured_pipeline()` in [test_real_llm_retention.py](file:///d:/nolqera/tests/test_real_llm_retention.py).
+2. If `sentence_transformers` is not installed in the active environment, instantiate `TFIDFEmbeddingProvider` fitted on `tokenize_words(line)` from the raw context to allow fast, standalone test execution without external transformer library dependencies:
+```python
+from nolqera import (
+    PipelineConfig,
+    create_default_configured_pipeline,
+)
+from nolqera.intelligence.semantic_similarity.embeddings.tfidf import (
+    TFIDFEmbeddingProvider,
+)
+from nolqera.tokenization import (
+    tokenize_words,
+)
+
+embedding_provider = TFIDFEmbeddingProvider()
+embedding_provider.fit([
+    tokenize_words(line)
+    for line in RAW_CONTEXT.splitlines()
+    if line.strip()
+])
+
+pipeline = create_default_configured_pipeline(
+    semantic_search_engine=SemanticSearchEngine(embedding_provider=embedding_provider),
+    ...,
+    config=PipelineConfig(max_sentences=10),
+)
+```
+
+### How to Avoid in Future
+* **Configure Sentence Allocation for Multi-Fact Prompts**: When setting up real LLM retention tests or benchmarks that query comprehensive factual topics, explicitly configure `PipelineConfig(max_sentences=N)` with a budget sufficient to retain all critical facts and entities.
+* **Fallback to Light Providers in Offline Test Suites**: Provide TF-IDF or mock embedding provider fallbacks in automated test environments where heavy dependencies like `sentence_transformers` are optional or not installed.
+
+---
+
+## 38. Integration Gap: Raw Preprocessing Noise Cleaners Omitted from Pipeline Input Handler
+### Error
+In initial audit of the pipeline input handling stage (`InputHandler.handle`), structural noise cleaners (`remove_urls`, `remove_email_addresses`, `remove_extra_whitespace`) were implemented in `nolqera/preprocessing/cleaner.py` but were not invoked in `InputHandler`. Raw inputs containing embedded URLs, email addresses, or excessive formatting whitespace were passed directly to sentence segmentation without structural noise removal.
+
+### Root Cause
+`InputHandler.handle` only executed basic whitespace splitting (`" ".join(raw_input.split())`), leaving pre-tokenization cleaning helpers unintegrated at the pipeline entry point.
+
+### How to Fix
+In [input_handler.py](file:///d:/nolqera/nolqera/intelligence/pipeline/input_handler.py), import and invoke the cleaner functions sequentially before validating non-empty text:
+```python
+from nolqera.preprocessing.cleaner import (
+    remove_email_addresses,
+    remove_extra_whitespace,
+    remove_urls,
+)
+
+class InputHandler:
+    def handle(self, raw_input: str) -> str:
+        if not isinstance(raw_input, str):
+            raise TypeError("raw_input must be a string")
+
+        if not raw_input.strip():
+            raise ValueError("raw_input cannot be empty")
+
+        text = remove_urls(raw_input)
+        text = remove_email_addresses(text)
+        text = remove_extra_whitespace(text)
+
+        if not text:
+            raise ValueError(
+                "raw_input contains no usable text after preprocessing"
+            )
+
+        return text
+```
+
+### How to Avoid in Future
+* **Pipeline Entry Point Binding**: When creating preprocessing utility functions, ensure they are bound directly to the pipeline entry handler (`InputHandler`) so that all raw inputs pass through standard structural noise cleaning.
+* **Validate Usable Text**: After applying structural noise filters, assert that the remaining text is non-empty before proceeding to segmentation and vector embedding generation.
+
+
+
+
+
 
 
 

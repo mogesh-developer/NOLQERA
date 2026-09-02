@@ -1,4 +1,7 @@
-from dataclasses import dataclass
+import csv
+import io
+import json
+from dataclasses import asdict, dataclass
 
 from .benchmark import BenchmarkResult
 
@@ -26,6 +29,24 @@ class EvaluationReport:
     context_quality_score: float
 
     latency_ms: float
+
+    def to_dict(self) -> dict:
+        """Export evaluation report to dictionary format."""
+        return asdict(self)
+
+    def to_json(self, indent: int | None = None) -> str:
+        """Export evaluation report to JSON string."""
+        return json.dumps(self.to_dict(), indent=indent)
+
+    def to_csv(self) -> str:
+        """Export evaluation report to single-row CSV format."""
+        output = io.StringIO()
+        data = self.to_dict()
+        writer = csv.DictWriter(output, fieldnames=list(data.keys()))
+        writer.writeheader()
+        writer.writerow(data)
+        return output.getvalue()
+
 
 
 def generate_evaluation_report(

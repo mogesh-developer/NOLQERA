@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import json
@@ -8,13 +9,15 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from dotenv import load_dotenv
+from transformers import AutoTokenizer
 
 from nolqera import (
     NOLQERAPipeline,
     PipelineConfig,
-    create_default_configured_pipeline,
     run_pipeline,
+    create_default_configured_pipeline,
 )
+
 from nolqera.intelligence.context_optimization.context_ranking import ContextRanker
 from nolqera.intelligence.context_optimization.noise_detection import NoiseDetector
 from nolqera.intelligence.entities.engine import EntityEngine
@@ -25,10 +28,12 @@ from nolqera.intelligence.pipeline.context_compressor import ContextCompressor
 from nolqera.intelligence.pipeline.context_ranker import ContextRankingAnalyzer
 from nolqera.intelligence.pipeline.noise_remover import NoiseRemover
 from nolqera.intelligence.semantic_search.engine import SemanticSearchEngine
-from nolqera.intelligence.semantic_similarity.embeddings.transformer import (
-    TransformerEmbeddingProvider,
+from nolqera.intelligence.semantic_similarity.embeddings.tfidf import (
+    TFIDFEmbeddingProvider,
 )
-from nolqera.tokenization.tokenizer import Tokenizer
+from nolqera.tokenization import (
+    tokenize_words,
+)
 
 
 load_dotenv()
@@ -36,10 +41,14 @@ load_dotenv()
 GLM_API_KEY = os.getenv("GLM_API_KEY")
 
 if not GLM_API_KEY:
-    raise RuntimeError("GLM_API_KEY not found in environment or .env file.")
+    raise RuntimeError("GLM_API_KEY not found")
 
 GLM_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 GLM_MODEL = "glm-4.5-flash"
+
+# GLM's tokenizer is not exposed by this API, so use one stable subword
+# tokenizer for an apples-to-apples comparison of raw and optimized context.
+TOKENIZER = None
 
 
 QUERY = """
@@ -112,9 +121,12 @@ technology.
 # ============================================================
 
 def build_nolqera_pipeline() -> NOLQERAPipeline:
-    embedding_provider = TransformerEmbeddingProvider(
-        model_name="all-MiniLM-L6-v2"
-    )
+    embedding_provider = TFIDFEmbeddingProvider()
+    embedding_provider.fit([
+        tokenize_words(line)
+        for line in RAW_CONTEXT.splitlines()
+        if line.strip()
+    ])
 
     semantic_search_engine = SemanticSearchEngine(
         embedding_provider=embedding_provider
@@ -160,31 +172,24 @@ def call_glm(prompt: str) -> tuple[str, float]:
     )
 
     start = time.perf_counter()
-    max_retries = 3
-    data = {}
 
-    for attempt in range(1, max_retries + 1):
-        try:
-            with urlopen(request, timeout=180) as response:
-                data = json.loads(
-                    response.read().decode("utf-8")
-                )
-            break
-        except (TimeoutError, URLError) as exc:
-            if attempt == max_retries:
-                raise RuntimeError(
-                    f"GLM Flash API request timed out after {max_retries} attempts: {exc}"
-                ) from exc
-            time.sleep(2 * attempt)
-        except HTTPError as exc:
-            error_body = exc.read().decode("utf-8", errors="replace")
-            if exc.code in (429, 502, 503, 504) and attempt < max_retries:
-                time.sleep(2 * attempt)
-                continue
-            raise RuntimeError(
-                f"GLM HTTP error: {exc.code} {exc.reason}\n"
-                f"{error_body}"
-            ) from exc
+    try:
+        with urlopen(request, timeout=120) as response:
+            data = json.loads(
+                response.read().decode("utf-8")
+            )
+
+    except HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"GLM HTTP error: {exc.code} {exc.reason}\n"
+            f"{error_body}"
+        ) from exc
+
+    except URLError as exc:
+        raise RuntimeError(
+            "Cannot connect to GLM Flash API."
+        ) from exc
 
     latency_ms = (
         time.perf_counter() - start
@@ -329,14 +334,16 @@ def calculate_retention(results: dict) -> float:
 # HELPERS
 # ============================================================
 
-TOKENIZER = Tokenizer()
-
-
 def token_count(text: str) -> int:
+    global TOKENIZER
+
+    if TOKENIZER is None:
+        TOKENIZER = AutoTokenizer.from_pretrained("gpt2")
+
     return len(
-        TOKENIZER.tokenize(
+        TOKENIZER.encode(
             text,
-            lowercase=False,
+            add_special_tokens=False,
         )
     )
 
@@ -361,7 +368,7 @@ def reduction_percentage(
 def main():
 
     print("=" * 72)
-    print("NOLQERA REAL-WORLD INFORMATION RETENTION TEST (GLM-4.5-FLASH)")
+    print("NOLQERA REAL-WORLD INFORMATION RETENTION TEST")
     print("=" * 72)
 
     print()
