@@ -14,7 +14,7 @@ from .models import (
     PipelineResult,
 )
 from .orchestrator import NOLQERAPipeline
-
+from .integration import NOLQERAEngine, create_engine
 __all__ = [
     "NOLQERAPipeline",
     "PipelineConfig",
@@ -26,4 +26,6 @@ __all__ = [
     "PipelineStageError",
     "run_pipeline",
     "create_default_configured_pipeline",
+    "NOLQERAEngine",
+    "create_engine",
 ]

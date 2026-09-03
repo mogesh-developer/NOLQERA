@@ -4,6 +4,13 @@ from .config import PipelineConfig
 from .models import PipelineResult
 from .orchestrator import NOLQERAPipeline
 
+class NOLQERAEngine:
+    def __init__(self,pipeline: NOLQERAPipeline)->None:
+        if not isinstance(pipeline, NOLQERAPipeline):
+            raise TypeError("pipeline must be NOLQERAPipeline")
+        self.pipeline = pipeline
+    def process(self,query: str,raw_input: str)->PipelineResult:
+        return run_pipeline(pipeline=self.pipeline, query=query,raw_input=raw_input)
 
 def run_pipeline(
     pipeline: NOLQERAPipeline,
@@ -69,3 +76,30 @@ def create_default_configured_pipeline(
         context_compressor=context_compressor,
         config=config,
     )
+
+def create_engine(
+    semantic_search_engine,
+    importance_engine,
+    keyphrase_engine,
+    entity_engine,
+    intent_engine,
+    noise_remover,
+    context_ranker,
+    context_compressor,
+    config: PipelineConfig | None = None,
+) -> NOLQERAEngine:
+    """Construct the public NOLQERA integration engine."""
+
+    pipeline = create_default_configured_pipeline(
+        semantic_search_engine=semantic_search_engine,
+        importance_engine=importance_engine,
+        keyphrase_engine=keyphrase_engine,
+        entity_engine=entity_engine,
+        intent_engine=intent_engine,
+        noise_remover=noise_remover,
+        context_ranker=context_ranker,
+        context_compressor=context_compressor,
+        config=config,
+    )
+
+    return NOLQERAEngine(pipeline)

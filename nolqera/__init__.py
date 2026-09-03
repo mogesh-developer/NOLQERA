@@ -18,6 +18,8 @@ from .tokenization import Tokenizer
 from .utils import train_test_split
 from .document import Document, Sentence
 
+    
+
 from nolqera.intelligence.pipeline import (
     NOLQERAPipeline,
     PipelineConfig,
@@ -29,6 +31,8 @@ from nolqera.intelligence.pipeline import (
     PipelineStageError,
     run_pipeline,
     create_default_configured_pipeline,
+    NOLQERAEngine,
+    create_engine,
 )
 
 

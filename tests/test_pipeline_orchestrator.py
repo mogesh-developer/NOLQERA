@@ -507,3 +507,13 @@ def test_pipeline_rejects_invalid_configuration():
         create_pipeline(
             config="invalid"
         )
+
+def test_nolqera_engine_process():
+        from nolqera.intelligence.pipeline.integration import NOLQERAEngine
+
+        pipeline= create_pipeline()
+        engine = NOLQERAEngine(pipeline)
+
+        result = engine.process(query="python API", raw_input="python API development with FastAPI")
+
+        assert result is not None
