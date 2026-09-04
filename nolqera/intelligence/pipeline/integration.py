@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from nolqera.intelligence.entities import (
+    EntityEngine,
+    HuggingFaceEntityRecognizer,
+)
+
 from .config import PipelineConfig
 from .models import PipelineResult
 from .orchestrator import NOLQERAPipeline
@@ -87,8 +92,32 @@ def create_engine(
     context_ranker,
     context_compressor,
     config: PipelineConfig | None = None,
+    use_external_recognizer: bool = False,
+    recognizer: HuggingFaceEntityRecognizer | None = None,
 ) -> NOLQERAEngine:
     """Construct the public NOLQERA integration engine."""
+
+    if not isinstance(use_external_recognizer, bool):
+        raise TypeError(
+            "use_external_recognizer must be a boolean"
+        )
+
+    if use_external_recognizer:
+        if recognizer is None:
+            recognizer = HuggingFaceEntityRecognizer()
+
+        if not isinstance(
+            recognizer,
+            HuggingFaceEntityRecognizer,
+        ):
+            raise TypeError(
+                "recognizer must be a HuggingFaceEntityRecognizer"
+            )
+
+        entity_engine = EntityEngine(
+            recognizer=recognizer,
+            use_external_recognizer=True,
+        )
 
     pipeline = create_default_configured_pipeline(
         semantic_search_engine=semantic_search_engine,

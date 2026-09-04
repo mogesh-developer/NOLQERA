@@ -486,3 +486,47 @@ def test_e2e_invalid_input_flow():
             query="Python",
             raw_input="   ",
         )
+def test_pipeline_process_with_external_entity_recognizer():
+    from nolqera.intelligence.entities import (
+        EntityEngine,
+        HuggingFaceEntityRecognizer,
+    )
+    from nolqera.intelligence.pipeline.integration import create_engine
+
+    engine = create_engine(
+        semantic_search_engine=SemanticSearchEngine(
+            embedding_provider=FakeEmbeddingProvider()
+        ),
+        importance_engine=ImportanceEngine(),
+        keyphrase_engine=KeyphraseEngine(),
+        entity_engine=EntityEngine(),
+        intent_engine=IntentEngine(),
+        noise_remover=NoiseRemover(
+            NoiseDetector()
+        ),
+        context_ranker=ContextRankingAnalyzer(
+            ContextRanker()
+        ),
+        context_compressor=ContextCompressor(),
+        use_external_recognizer=True,
+        recognizer=HuggingFaceEntityRecognizer(),
+    )
+
+    text = (
+        "The application is built using FastAPI. "
+        "The application uses MongoDB for data storage. "
+        "Python is the main programming language."
+    )
+
+    result = engine.process(
+        query="What technologies are used?",
+        raw_input=text,
+    )
+
+    assert isinstance(result, PipelineResult)
+
+    values = [entity.text for entity in result.entities]
+
+    assert "FastAPI" in values
+    assert "MongoDB" in values
+    assert "Python" in values

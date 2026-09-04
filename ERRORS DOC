@@ -1031,9 +1031,25 @@ In [adapters.py](file:///d:/nolqera/nolqera/intelligence/entities/adapters.py):
 * **Run Syntax Checks Before Running Tests**: Use `python -m py_compile` or an IDE syntax validator to catch syntax errors like unterminated string literals before running test suites.
 * **Match Unit Test Contracts**: Verify that class method names (`to_result` vs `to_results`) and exception types (`TypeError` vs `ValueError`) match caller specifications in test files.
 
+---
 
+## 40. Missing Imports for HuggingFaceEntityRecognizer and EntityEngine in Integration Module
+### Error
+Static analysis checks or factory execution via `create_engine(..., use_external_recognizer=True)` failed with:
+`Could not find name HuggingFaceEntityRecognizer @[d:\nolqera\nolqera\intelligence\pipeline\integration.py:L91]` or `NameError: name 'HuggingFaceEntityRecognizer' is not defined`.
 
+### Root Cause
+In [integration.py](file:///d:/nolqera/nolqera/intelligence/pipeline/integration.py), `create_engine()` declared parameter type annotations (`recognizer: HuggingFaceEntityRecognizer | None = None`) and instantiated classes (`HuggingFaceEntityRecognizer()`, `isinstance(..., HuggingFaceEntityRecognizer)`, `EntityEngine(...)`), but neither `HuggingFaceEntityRecognizer` nor `EntityEngine` was imported at the top of the file.
 
+### How to Fix
+In [integration.py](file:///d:/nolqera/nolqera/intelligence/pipeline/integration.py), import `EntityEngine` and `HuggingFaceEntityRecognizer` from `nolqera.intelligence.entities`:
+```python
+from nolqera.intelligence.entities import (
+    EntityEngine,
+    HuggingFaceEntityRecognizer,
+)
+```
 
-
-
+### How to Avoid in Future
+* **Audit Module Exports and Imports**: When referencing classes across subpackages (such as `entities` inside `pipeline`), verify that all required types and classes are explicitly imported at the top of the module.
+* **Run Static Type Checking**: Use static analyzers (e.g., `pyright`, `mypy`, or IDE linters) to detect undefined names in function signatures and factory entry points prior to runtime execution.
