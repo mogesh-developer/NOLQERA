@@ -93,3 +93,21 @@ def test_invalid_text_is_rejected():
         return
 
     assert False
+
+def test_sentence_initial_common_words_are_not_candidates():
+    text = (
+        "The application is built using FastAPI. "
+        "The application uses MongoDB for data storage. "
+        "Python is the main programming language."
+    )
+
+    extractor = EntityCandidateExtractor()
+
+    candidates = extractor.extract(text)
+
+    values = [candidate.text for candidate in candidates]
+
+    assert "The" not in values
+    assert "FastAPI" in values
+    assert "MongoDB" in values
+    assert "Python" in values

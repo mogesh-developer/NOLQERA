@@ -50,13 +50,24 @@ class EntityCandidateExtractor:
 
     # Words that commonly connect words inside a proper noun.
     # These are linguistic connectors, NOT entity names.
-    _CONNECTORS = {
-        "of",
-        "the",
-        "and",
-        "for",
-        "at",
-        "in",
+    _COMMON_WORDS = {
+        "the", "a", "an", "this", "that", "these", "those",
+        "it", "its", "they", "them", "their", "we", "us", "our",
+        "he", "him", "his", "she", "her", "hers", "you", "your",
+        "yours", "i", "me", "my", "mine", "who", "whom", "whose",
+        "which", "what", "where", "when", "why", "how", "if",
+        "then", "else", "and", "or", "but", "so", "because",
+        "as", "until", "while", "of", "at", "by", "for", "with",
+        "about", "against", "between", "into", "through",
+        "during", "before", "after", "above", "below", "to",
+        "from", "up", "down", "in", "out", "on", "off", "over",
+        "under", "again", "further", "then", "once", "here",
+        "there", "all", "any", "both", "each", "few", "more",
+        "most", "other", "some", "such", "no", "nor", "not",
+        "only", "own", "same", "than", "too", "very", "can",
+        "will", "just", "should", "now", "is", "are", "was",
+        "were", "be", "been", "being", "have", "has", "had",
+        "do", "does", "did", "application", "system", "data"
     }
 
     def extract(
@@ -82,9 +93,18 @@ class EntityCandidateExtractor:
         )
 
         for match in single_cap_pattern.finditer(text):
+            value = match.group()
+
+            if self._is_sentence_initial_word(
+                text,
+                match.start(),
+                value,
+            ) and value.lower() in self._COMMON_WORDS:
+                continue
+
             candidates.append(
                 EntityCandidate(
-                    text=match.group(),
+                    text=value,
                     start=match.start(),
                     end=match.end(),
                 )

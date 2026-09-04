@@ -1004,6 +1004,32 @@ class InputHandler:
 * **Pipeline Entry Point Binding**: When creating preprocessing utility functions, ensure they are bound directly to the pipeline entry handler (`InputHandler`) so that all raw inputs pass through standard structural noise cleaning.
 * **Validate Usable Text**: After applying structural noise filters, assert that the remaining text is non-empty before proceeding to segmentation and vector embedding generation.
 
+---
+
+## 39. SyntaxError and Method Signature Mismatch in EntityAdapter
+### Error
+Running `pytest tests/test_entity_adapter.py -v -s` failed during import or test execution with:
+```
+SyntaxError: unterminated string literal (detected at line 18)
+```
+and `TypeError` / `ValueError` failures due to missing method `to_result` on `EntityAdapter`.
+
+### Root Cause
+1. In `nolqera/intelligence/entities/adapters.py`, line 18 contained broken syntax `if missing"`.
+2. `required_fields` dictionary set contained a missing comma between `"entity_type"` and `"score"`, as well as a typo `"test"` instead of `"text"`.
+3. Set subtraction for detecting missing fields was miswritten as `missing = required_fields = entity.keys()`.
+4. `EntityAdapter` defined `@staticmethod def to_results(entity: dict)` instead of `to_result(entity: dict)` for single entity conversions, creating a name collision with `@classmethod def to_results(cls, entities: list[dict])`.
+
+### How to Fix
+In [adapters.py](file:///d:/nolqera/nolqera/intelligence/entities/adapters.py):
+1. Fix syntax error `if missing:` and repair `required_fields = {"text", "entity_type", "score", "start", "end"}`.
+2. Correct missing fields calculation to `missing = required_fields - entity.keys()`.
+3. Separate `to_result(entity: dict)` (single dict input) from `to_results(entities: list[dict])` (list input).
+4. Perform explicit type conversions (`float(entity["score"])`, `int(entity["start"])`, `int(entity["end"])`).
+
+### How to Avoid in Future
+* **Run Syntax Checks Before Running Tests**: Use `python -m py_compile` or an IDE syntax validator to catch syntax errors like unterminated string literals before running test suites.
+* **Match Unit Test Contracts**: Verify that class method names (`to_result` vs `to_results`) and exception types (`TypeError` vs `ValueError`) match caller specifications in test files.
 
 
 
